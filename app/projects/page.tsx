@@ -1,3 +1,4 @@
+"use client"
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import api from "../../app/api/axios/route";
