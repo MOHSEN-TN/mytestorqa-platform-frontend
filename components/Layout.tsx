@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { removeToken } from "../utils/storage";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function Layout() {
   const navigate = useNavigate();

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
-import api from "../api/axios";
-import { useTheme } from "../context/ThemeContext";
+import api from "../../app/api/axios/route";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function SettingsPage() {
   const [oldPassword, setOldPassword] = useState("");

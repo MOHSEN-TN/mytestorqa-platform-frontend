@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
-import api from "../api/axios";
-import { useTheme } from "../context/ThemeContext";
-import { useProject } from "../context/ProjectContext";
+import api from "../../app/api/axios/route";
+import { useTheme } from "../../context/ThemeContext";
+import { useProject } from "../../context/ProjectContext";
 
 type Project = {
   id: string;

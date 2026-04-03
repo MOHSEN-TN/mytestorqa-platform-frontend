@@ -1,34 +1,28 @@
+"use client";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { login } from "../api/auth";
-import { setToken } from "../utils/storage";
+import { login } from "../../app/api/auth/route";
+import { setToken } from "../../utils/storage";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
 
   const [email, setEmail] = useState("aissaouimohsen@gmail.com");
   const [password, setPassword] = useState("Admin12345!");
   const [error, setError] = useState("");
-
-  const navigate = useNavigate();
-
+  const router = useRouter()
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     try {
-
       const data = await login(email, password);
-
       setToken(data.access_token);
-
-      navigate("/dashboard");
-
+      router.push("/dashboard");
     } catch (err) {
       setError("Login failed");
     }
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "80px auto" }}>
+    <div className="w-max-[400px] m-20">
       <h1>MyTestorQAPlatform</h1>
       <h2>Login</h2>
 

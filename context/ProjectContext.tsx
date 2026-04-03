@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { createContext, useContext, useEffect, useState } from "react";
 
 type Project = {
