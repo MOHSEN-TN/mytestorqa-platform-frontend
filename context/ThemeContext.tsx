@@ -1,4 +1,6 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
+
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 type Theme = "light" | "dark";
@@ -12,14 +14,18 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null;
-    return savedTheme || "light";
-  });
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setTheme(savedTheme);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("theme", theme);
-    document.body.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
   const value = useMemo(

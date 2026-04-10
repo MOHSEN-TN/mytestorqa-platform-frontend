@@ -1,57 +1,91 @@
 "use client";
 
-import { useState } from "react";
-import { login } from "../../app/api/auth/route";
-import { setToken } from "../../utils/storage";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
 
-  const [email, setEmail] = useState("aissaouimohsen@gmail.com");
-  const [password, setPassword] = useState("Admin12345!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const router = useRouter()
-  async function handleSubmit(e: React.FormEvent) {
+
+  useEffect(() => {
+    const checkAlreadyLoggedIn = async () => {
+      try {
+        const res = await fetch("http://localhost:3001/auth/me", {
+          credentials: "include",
+        });
+
+        if (res.ok) {
+          router.replace("/dashboard");
+        }
+      } catch {}
+    };
+
+    checkAlreadyLoggedIn();
+  }, [router]);
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError("");
+
     try {
-      const data = await login(email, password);
-      setToken(data.access_token);
-      router.push("/dashboard");
-    } catch (err) {
-      setError("Login failed");
+      const res = await fetch("http://localhost:3001/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Erreur de login");
+      }
     }
-  }
+  };
 
   return (
-    <div className="w-max-[400px] m-20">
-      <h1>MyTestorQAPlatform</h1>
-      <h2>Login</h2>
+    <div className="p-6 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Login</h1>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <input
+          type="email"
+          placeholder="Email"
+          className="border p-2 w-full"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-        <div>
-          <label>Email</label>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-          />
-        </div>
+        <input
+          type="password"
+          placeholder="Password"
+          className="border p-2 w-full"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-        <div>
-          <label>Password</label>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-          />
-        </div>
-
-        {error && <p style={{ color: "red" }}>{error}</p>}
-
-        <button type="submit">Sign in</button>
-
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Login
+        </button>
       </form>
+
+      {error && <p className="text-red-500 mt-3">{error}</p>}
     </div>
   );
 }
