@@ -84,3 +84,20 @@ export async function deleteProject(id: string): Promise<void> {
     throw new Error(`Erreur suppression projet: ${text}`);
   }
 }
+
+export async function duplicateProject(id: string): Promise<Project> {
+  const res = await fetch(`${API_URL}/${id}/duplicate`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erreur duplication projet: ${text}`);
+  }
+
+  return res.json();
+}

@@ -11,22 +11,14 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const checkAlreadyLoggedIn = async () => {
-      try {
-        const res = await fetch("http://localhost:3001/auth/me", {
-          credentials: "include",
-        });
-
-        if (res.ok) {
-          router.replace("/dashboard");
-        }
-      } catch {}
-    };
-
-    checkAlreadyLoggedIn();
+    fetch("http://localhost:3001/auth/me", {
+      credentials: "include",
+    }).then((res) => {
+      if (res.ok) router.replace("/dashboard");
+    });
   }, [router]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -34,58 +26,79 @@ export default function LoginPage() {
       const res = await fetch("http://localhost:3001/auth/login", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
-      }
+      if (!res.ok) throw new Error(await res.text());
 
       router.replace("/dashboard");
       router.refresh();
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Erreur de login");
-      }
+    } catch (err: any) {
+      setError(err.message || "Erreur login");
     }
   };
 
   return (
-    <div className="p-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Login</h1>
+    <main className="relative min-h-screen flex items-center justify-center">
 
-      <form onSubmit={handleLogin} className="space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          className="border p-2 w-full"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      {/* BACKGROUND IMAGE */}
+      <div
+        className="absolute inset-0 bg-center bg-cover"
+        style={{
+          backgroundImage: "url('/images/auth-bg.png')",
+        }}
+      />
 
-        <input
-          type="password"
-          placeholder="Password"
-          className="border p-2 w-full"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+      {/* OVERLAY (pro effect) */}
+     <div className="absolute inset-0 bg-white/10" />
 
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Login
-        </button>
-      </form>
+      {/* LOGIN CARD */}
+      <div className="relative z-10 w-full max-w-md bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl">
 
-      {error && <p className="text-red-500 mt-3">{error}</p>}
-    </div>
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-800">
+            QA Platform
+          </h1>
+          <p className="text-gray-500 text-sm">
+            Smart Testing Workspace • 2026
+          </p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-4">
+
+          <input
+            type="email"
+            placeholder="Email"
+            className="w-full p-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full p-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <button
+            type="submit"
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:opacity-90"
+          >
+            Login
+          </button>
+        </form>
+
+        {error && (
+          <p className="text-red-500 mt-4 text-sm text-center">{error}</p>
+        )}
+
+        <p className="text-center text-xs text-gray-400 mt-6">
+          TEST • AUTO • IA • QUALITÉ • AUDIT
+        </p>
+      </div>
+    </main>
   );
 }

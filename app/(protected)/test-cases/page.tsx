@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getProjects, Project } from "@/lib/project-api";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchProjects, setSelectedProject } from "@/lib/slices/projectSlice";
 import {
+  clearTestSuites,
+  createTestSuite,
+  deleteTestSuite,
+  duplicateTestSuite,
+  fetchTestSuites,
+  setSelectedSuite,
+  updateTestSuite,
+} from "@/lib/slices/testSuiteSlice";
+import {
+  clearTestCases,
   createTestCase,
-  getTestCases,
+  deleteTestCase,
+  duplicateTestCase,
+  fetchTestCases,
   TestCase,
-} from "@/lib/testcase-api";
+  TestStep,
+  updateTestCase,
+} from "@/lib/slices/testCaseSlice";
 
 type StepForm = {
   action: string;
@@ -14,154 +30,505 @@ type StepForm = {
 };
 
 export default function TestCasesPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [testCases, setTestCases] = useState<TestCase[]>([]);
+  const dispatch = useAppDispatch();
+  const fullscreenRef = useRef<HTMLDivElement | null>(null);
 
-  const [loadingProjects, setLoadingProjects] = useState(true);
-  const [loadingTestCases, setLoadingTestCases] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const {
+    projects,
+    loading: loadingProjects,
+    selectedProject,
+    error: projectError,
+  } = useAppSelector((state) => state.projects);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [expected, setExpected] = useState("");
-  const [status, setStatus] = useState<"DRAFT" | "READY" | "DEPRECATED">(
-    "DRAFT",
-  );
-  const [priority, setPriority] = useState<
+  const {
+    testSuites,
+    selectedSuite,
+    loading: loadingSuites,
+    creating: creatingSuite,
+    updating: updatingSuite,
+    deleting: deletingSuite,
+    error: suiteError,
+  } = useAppSelector((state) => state.testSuites);
+
+  const {
+    testCases,
+    loading: loadingTestCases,
+    creating,
+    updating,
+    deleting,
+    error: testCaseError,
+  } = useAppSelector((state) => state.testCases);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [collapsedProjects, setCollapsedProjects] = useState(false);
+  const [collapsedSuites, setCollapsedSuites] = useState(false);
+
+  const [isCreateSuiteOpen, setIsCreateSuiteOpen] = useState(false);
+  const [suiteName, setSuiteName] = useState("");
+  const [suiteDescription, setSuiteDescription] = useState("");
+
+  const [editingSuite, setEditingSuite] = useState<{
+    id: string;
+    name: string;
+    description?: string | null;
+  } | null>(null);
+  const [editSuiteName, setEditSuiteName] = useState("");
+  const [editSuiteDescription, setEditSuiteDescription] = useState("");
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createTitle, setCreateTitle] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
+  const [createExpected, setCreateExpected] = useState("");
+  const [createStatus, setCreateStatus] = useState<
+    "DRAFT" | "READY" | "DEPRECATED"
+  >("DRAFT");
+  const [createPriority, setCreatePriority] = useState<
     "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
   >("MEDIUM");
-  const [steps, setSteps] = useState<StepForm[]>([
+  const [createSteps, setCreateSteps] = useState<StepForm[]>([
     { action: "", expected: "" },
   ]);
 
-  const loadProjects = async () => {
-    try {
-      setError("");
-      const data = await getProjects();
-      setProjects(data);
-
-      if (data.length > 0) {
-        setSelectedProjectId(data[0].id);
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Impossible de récupérer les projets");
-      }
-    } finally {
-      setLoadingProjects(false);
-    }
-  };
-
-  const loadTestCases = async (projectId: string) => {
-    if (!projectId) return;
-
-    try {
-      setLoadingTestCases(true);
-      setError("");
-      const data = await getTestCases(projectId);
-      setTestCases(data);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Impossible de récupérer les cas de test");
-      }
-      setTestCases([]);
-    } finally {
-      setLoadingTestCases(false);
-    }
-  };
+  const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editExpected, setEditExpected] = useState("");
+  const [editStatus, setEditStatus] = useState<"DRAFT" | "READY" | "DEPRECATED">(
+    "DRAFT"
+  );
+  const [editPriority, setEditPriority] = useState<
+    "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  >("MEDIUM");
+  const [editSteps, setEditSteps] = useState<StepForm[]>([
+    { action: "", expected: "" },
+  ]);
 
   useEffect(() => {
-    loadProjects();
+    dispatch(fetchProjects());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!selectedProject?.id) {
+      dispatch(clearTestSuites());
+      dispatch(clearTestCases());
+      return;
+    }
+
+    dispatch(fetchTestSuites(selectedProject.id));
+    dispatch(clearTestCases());
+  }, [dispatch, selectedProject?.id]);
+
+  useEffect(() => {
+    if (!selectedSuite?.id) {
+      dispatch(clearTestCases());
+      return;
+    }
+
+    dispatch(fetchTestCases(selectedSuite.id));
+  }, [dispatch, selectedSuite?.id]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    };
   }, []);
 
-  useEffect(() => {
-    if (selectedProjectId) {
-      loadTestCases(selectedProjectId);
-    }
-  }, [selectedProjectId]);
-
-  const resetForm = () => {
-    setTitle("");
-    setDescription("");
-    setExpected("");
-    setStatus("DRAFT");
-    setPriority("MEDIUM");
-    setSteps([{ action: "", expected: "" }]);
+  const resetFiltersPage = () => {
+    setCurrentPage(1);
+    setExpandedId(null);
   };
 
-  const handleStepChange = (
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetFiltersPage();
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    resetFiltersPage();
+  };
+
+  const handlePriorityFilterChange = (value: string) => {
+    setPriorityFilter(value);
+    resetFiltersPage();
+  };
+
+  const filteredTestCases = useMemo(() => {
+    return testCases.filter((tc) => {
+      const matchesSearch =
+        tc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (tc.description ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus =
+        statusFilter === "ALL" ? true : tc.status === statusFilter;
+
+      const matchesPriority =
+        priorityFilter === "ALL" ? true : tc.priority === priorityFilter;
+
+      return matchesSearch && matchesStatus && matchesPriority;
+    });
+  }, [testCases, searchTerm, statusFilter, priorityFilter]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTestCases.length / itemsPerPage)
+  );
+
+  const paginatedTestCases = filteredTestCases.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const globalError = projectError || suiteError || testCaseError;
+
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case "READY":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "DRAFT":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "DEPRECATED":
+        return "bg-gray-200 text-gray-700 border-gray-300";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+  };
+
+  const getPriorityClass = (priority: string) => {
+    switch (priority) {
+      case "CRITICAL":
+        return "bg-red-100 text-red-700 border-red-200";
+      case "HIGH":
+        return "bg-orange-100 text-orange-700 border-orange-200";
+      case "MEDIUM":
+        return "bg-blue-100 text-blue-700 border-blue-200";
+      case "LOW":
+        return "bg-gray-100 text-gray-700 border-gray-200";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await fullscreenRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error("Erreur fullscreen:", error);
+    }
+  };
+
+  const resetCreateSuiteForm = () => {
+    setSuiteName("");
+    setSuiteDescription("");
+  };
+
+  const openCreateSuiteModal = () => {
+    resetCreateSuiteForm();
+    setIsCreateSuiteOpen(true);
+  };
+
+  const closeCreateSuiteModal = () => {
+    setIsCreateSuiteOpen(false);
+    resetCreateSuiteForm();
+  };
+
+  const openEditSuiteModal = (suite: {
+    id: string;
+    name: string;
+    description?: string | null;
+  }) => {
+    setEditingSuite(suite);
+    setEditSuiteName(suite.name);
+    setEditSuiteDescription(suite.description ?? "");
+  };
+
+  const closeEditSuiteModal = () => {
+    setEditingSuite(null);
+    setEditSuiteName("");
+    setEditSuiteDescription("");
+  };
+
+  const resetCreateForm = () => {
+    setCreateTitle("");
+    setCreateDescription("");
+    setCreateExpected("");
+    setCreateStatus("DRAFT");
+    setCreatePriority("MEDIUM");
+    setCreateSteps([{ action: "", expected: "" }]);
+  };
+
+  const openCreateModal = () => {
+    resetCreateForm();
+    setIsCreateOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setIsCreateOpen(false);
+    resetCreateForm();
+  };
+
+  const handleCreateStepChange = (
     index: number,
     field: "action" | "expected",
-    value: string,
+    value: string
   ) => {
-    setSteps((prev) =>
-      prev.map((step, i) =>
-        i === index ? { ...step, [field]: value } : step,
-      ),
+    setCreateSteps((prev) =>
+      prev.map((step, i) => (i === index ? { ...step, [field]: value } : step))
     );
   };
 
-  const addStep = () => {
-    setSteps((prev) => [...prev, { action: "", expected: "" }]);
+  const addCreateStep = () => {
+    setCreateSteps((prev) => [...prev, { action: "", expected: "" }]);
   };
 
-  const removeStep = (index: number) => {
-    setSteps((prev) => prev.filter((_, i) => i !== index));
+  const removeCreateStep = (index: number) => {
+    setCreateSteps((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddTestCase = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateSuite = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!selectedProjectId) {
-      setError("Veuillez sélectionner un projet");
-      return;
-    }
+    if (!selectedProject?.id) return;
+    if (!suiteName.trim()) return;
 
-    if (!title.trim()) {
-      setError("Le titre est obligatoire");
-      return;
-    }
+    const resultAction = await dispatch(
+      createTestSuite({
+        projectId: selectedProject.id,
+        name: suiteName.trim(),
+        description: suiteDescription.trim() || undefined,
+      })
+    );
 
-    const cleanedSteps = steps
+    if (createTestSuite.fulfilled.match(resultAction)) {
+      closeCreateSuiteModal();
+      dispatch(fetchTestSuites(selectedProject.id));
+    }
+  };
+
+  const handleUpdateSuite = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!editingSuite || !editSuiteName.trim() || !selectedProject?.id) return;
+
+    const resultAction = await dispatch(
+      updateTestSuite({
+        suiteId: editingSuite.id,
+        name: editSuiteName.trim(),
+        description: editSuiteDescription.trim() || undefined,
+      })
+    );
+
+    if (updateTestSuite.fulfilled.match(resultAction)) {
+      closeEditSuiteModal();
+      dispatch(fetchTestSuites(selectedProject.id));
+    }
+  };
+
+  const handleDeleteSuite = async (suiteId: string) => {
+    if (!selectedProject?.id) return;
+
+    const confirmed = window.confirm("Supprimer cette suite ?");
+    if (!confirmed) return;
+
+    const resultAction = await dispatch(deleteTestSuite(suiteId));
+
+    if (deleteTestSuite.fulfilled.match(resultAction)) {
+      dispatch(fetchTestSuites(selectedProject.id));
+      dispatch(clearTestCases());
+    }
+  };
+
+  const handleDuplicateSuite = async (suiteId: string) => {
+    if (!selectedProject?.id) return;
+
+    const resultAction = await dispatch(duplicateTestSuite(suiteId));
+
+    if (duplicateTestSuite.fulfilled.match(resultAction)) {
+      dispatch(fetchTestSuites(selectedProject.id));
+    }
+  };
+
+  const handleCreateTestCase = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!selectedSuite?.id) return;
+    if (!createTitle.trim()) return;
+
+    const cleanedSteps = createSteps
       .map((step) => ({
         action: step.action.trim(),
-        expected: step.expected.trim(),
+        expected: step.expected.trim() || undefined,
       }))
       .filter((step) => step.action !== "");
 
-    try {
-      setSubmitting(true);
-      setError("");
+    const resultAction = await dispatch(
+      createTestCase({
+        suiteId: selectedSuite.id,
+        title: createTitle.trim(),
+        description: createDescription.trim() || undefined,
+        expected: createExpected.trim() || undefined,
+        status: createStatus,
+        priority: createPriority,
+        steps: cleanedSteps.length ? cleanedSteps : undefined,
+      })
+    );
 
-      const created = await createTestCase(selectedProjectId, {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        expected: expected.trim() || undefined,
-        status,
-        priority,
-        steps: cleanedSteps.length > 0 ? cleanedSteps : undefined,
-      });
-
-      setTestCases((prev) => [created, ...prev]);
-      resetForm();
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Erreur lors de la création du cas de test");
-      }
-    } finally {
-      setSubmitting(false);
+    if (createTestCase.fulfilled.match(resultAction)) {
+      closeCreateModal();
+      dispatch(fetchTestCases(selectedSuite.id));
     }
   };
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const handleDuplicate = async (testCaseId: string) => {
+    if (!selectedSuite?.id) return;
+
+    const resultAction = await dispatch(
+      duplicateTestCase({
+        suiteId: selectedSuite.id,
+        testCaseId,
+      })
+    );
+
+    if (duplicateTestCase.fulfilled.match(resultAction)) {
+      dispatch(fetchTestCases(selectedSuite.id));
+    }
+  };
+
+  const openEditModal = (testCase: TestCase) => {
+    setEditingTestCase(testCase);
+    setEditTitle(testCase.title);
+    setEditDescription(testCase.description ?? "");
+    setEditExpected(testCase.expected ?? "");
+    setEditStatus(testCase.status);
+    setEditPriority(testCase.priority);
+    setEditSteps(
+      testCase.steps?.length
+        ? testCase.steps.map((step) => ({
+            action: step.action ?? "",
+            expected: step.expected ?? "",
+          }))
+        : [{ action: "", expected: "" }]
+    );
+  };
+
+  const closeEditModal = () => {
+    setEditingTestCase(null);
+    setEditTitle("");
+    setEditDescription("");
+    setEditExpected("");
+    setEditStatus("DRAFT");
+    setEditPriority("MEDIUM");
+    setEditSteps([{ action: "", expected: "" }]);
+  };
+
+  const handleEditStepChange = (
+    index: number,
+    field: "action" | "expected",
+    value: string
+  ) => {
+    setEditSteps((prev) =>
+      prev.map((step, i) => (i === index ? { ...step, [field]: value } : step))
+    );
+  };
+
+  const addEditStep = () => {
+    setEditSteps((prev) => [...prev, { action: "", expected: "" }]);
+  };
+
+  const removeEditStep = (index: number) => {
+    setEditSteps((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!selectedSuite?.id || !editingTestCase) return;
+    if (!editTitle.trim()) return;
+
+    const cleanedSteps = editSteps
+      .map((step) => ({
+        action: step.action.trim(),
+        expected: step.expected.trim() || undefined,
+      }))
+      .filter((step) => step.action !== "");
+
+    const resultAction = await dispatch(
+      updateTestCase({
+        suiteId: selectedSuite.id,
+        testCaseId: editingTestCase.id,
+        title: editTitle.trim(),
+        description: editDescription.trim() || undefined,
+        expected: editExpected.trim() || undefined,
+        status: editStatus,
+        priority: editPriority,
+        steps: cleanedSteps.length ? cleanedSteps : undefined,
+      })
+    );
+
+    if (updateTestCase.fulfilled.match(resultAction)) {
+      closeEditModal();
+      dispatch(fetchTestCases(selectedSuite.id));
+    }
+  };
+
+  const handleDelete = async (testCaseId: string) => {
+    if (!selectedSuite?.id) return;
+
+    const confirmed = window.confirm("Supprimer ce test case ?");
+    if (!confirmed) return;
+
+    const resultAction = await dispatch(
+      deleteTestCase({
+        suiteId: selectedSuite.id,
+        testCaseId,
+      })
+    );
+
+    if (deleteTestCase.fulfilled.match(resultAction)) {
+      dispatch(fetchTestCases(selectedSuite.id));
+    }
+  };
+
+  const projectColumnClass = collapsedProjects
+    ? "hidden"
+    : isFullscreen
+    ? "xl:col-span-2"
+    : "xl:col-span-3";
+
+  const suiteColumnClass = collapsedSuites
+    ? "hidden"
+    : isFullscreen
+    ? "xl:col-span-3"
+    : "xl:col-span-3";
+
+  const testCasesColumnClass = (() => {
+    if (collapsedProjects && collapsedSuites) return "xl:col-span-12";
+    if (collapsedProjects) return isFullscreen ? "xl:col-span-9" : "xl:col-span-9";
+    if (collapsedSuites) return isFullscreen ? "xl:col-span-10" : "xl:col-span-9";
+    return isFullscreen ? "xl:col-span-7" : "xl:col-span-6";
+  })();
+
+  const arrowButtonClass =
+    "absolute -left-5 z-20 h-10 w-10 cursor-pointer rounded-full shadow-md";
 
   if (loadingProjects) {
     return <div className="p-6">Chargement des projets...</div>;
@@ -169,89 +536,620 @@ export default function TestCasesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Test Cases</h1>
-        <p className="mt-1 text-gray-600">
-          Sélectionner un projet et gérer ses cas de test.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Test Management</h1>
+          <p className="mt-1 text-gray-600">Projet → Suites → Cas de test</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="rounded border bg-white px-4 py-2 text-sm shadow-sm hover:bg-gray-50"
+        >
+          {isFullscreen ? "Quitter plein écran" : "Plein écran"}
+        </button>
       </div>
 
-      {error && (
+      {globalError && (
         <div className="rounded border border-red-300 bg-red-50 p-3 text-red-700">
-          {error}
+          {globalError}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-lg border bg-white p-4 shadow-sm lg:col-span-1">
-          <h2 className="mb-4 text-lg font-semibold">Projets</h2>
-
-          {projects.length === 0 ? (
-            <p>Aucun projet trouvé.</p>
-          ) : (
-            <div className="space-y-2">
-              {projects.map((project) => {
-                const isSelected = project.id === selectedProjectId;
-
-                return (
-                  <button
-                    key={project.id}
-                    onClick={() => setSelectedProjectId(project.id)}
-                    className={`w-full rounded border px-4 py-3 text-left transition ${
-                      isSelected
-                        ? "border-blue-600 bg-blue-50 text-blue-700"
-                        : "border-gray-200 bg-white hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="font-medium">{project.name}</div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(project.createdAt).toLocaleString()}
-                    </div>
-                  </button>
-                );
-              })}
+      <div
+        ref={fullscreenRef}
+        className={`${
+          isFullscreen ? "overflow-auto bg-white p-6" : ""
+        }`}
+      >
+        {isFullscreen && (
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Vue plein écran</h2>
+              <p className="text-sm text-gray-500">
+                Appuie sur Échap ou utilise le bouton pour quitter.
+              </p>
             </div>
-          )}
-        </div>
 
-        <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold">
-              Ajouter un test case
-              {selectedProject ? ` — ${selectedProject.name}` : ""}
-            </h2>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="rounded border bg-white px-4 py-2 text-sm shadow-sm hover:bg-gray-50"
+            >
+              Fermer
+            </button>
+          </div>
+        )}
 
-            <form onSubmit={handleAddTestCase} className="space-y-4">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <section
+            className={`min-w-0 rounded-lg border bg-white p-4 shadow-sm ${projectColumnClass}`}
+          >
+            <h2 className="mb-4 text-lg font-semibold">Projects</h2>
+
+            {projects.length === 0 ? (
+              <p>Aucun projet trouvé.</p>
+            ) : (
+              <div className="space-y-2">
+                {projects.map((project) => {
+                  const isSelected = selectedProject?.id === project.id;
+
+                  return (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => dispatch(setSelectedProject(project))}
+                      className={`w-full rounded border px-4 py-3 text-left transition ${
+                        isSelected
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="font-medium break-words">{project.name}</div>
+                      <div className="text-sm text-gray-500">
+                        {project.createdAt
+                          ? new Date(project.createdAt).toLocaleString()
+                          : "-"}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section
+            className={`relative min-w-0 rounded-lg border bg-white p-4 shadow-sm ${suiteColumnClass}`}
+          >
+            <Image
+              src={
+                collapsedProjects
+                  ? "/images/icon2.png"
+                  : "/images/icon1.png"
+              }
+              alt={collapsedProjects ? "Ouvrir Projects" : "Fermer Projects"}
+              title={collapsedProjects ? "Ouvrir Projects" : "Fermer Projects"}
+              width={40}
+              height={40}
+              onClick={() => setCollapsedProjects((prev) => !prev)}
+              className={`${arrowButtonClass} top-12 hidden xl:block`}
+            />
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Test Suites</h2>
+              <button
+                type="button"
+                className="rounded bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                disabled={!selectedProject}
+                onClick={openCreateSuiteModal}
+              >
+                New Suite
+              </button>
+            </div>
+
+            {!selectedProject ? (
+              <p className="text-gray-500">Choisis d’abord un projet.</p>
+            ) : loadingSuites ? (
+              <p>Chargement des suites...</p>
+            ) : testSuites.length === 0 ? (
+              <p>Aucune suite trouvée.</p>
+            ) : (
+              <div className="space-y-2">
+                {testSuites.map((suite) => {
+                  const isSelected = selectedSuite?.id === suite.id;
+
+                  return (
+                    <div
+                      key={suite.id}
+                      className={`w-full rounded border px-4 py-3 text-left transition ${
+                        isSelected
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                          : "border-gray-200 bg-white"
+                      }`}
+                    >
+                      <div className="font-medium break-words">{suite.name}</div>
+                      <div className="text-sm text-gray-500 break-words">
+                        {suite.description || "No description"}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => dispatch(setSelectedSuite(suite))}
+                          className="rounded bg-slate-700 px-3 py-1 text-xs text-white"
+                        >
+                          {isSelected ? "Active" : "Choisir"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openEditSuiteModal(suite)}
+                          className="rounded bg-yellow-500 px-3 py-1 text-xs text-white"
+                        >
+                          Modify
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicateSuite(suite.id)}
+                          className="rounded bg-indigo-600 px-3 py-1 text-xs text-white"
+                        >
+                          Duplicate
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSuite(suite.id)}
+                          disabled={deletingSuite}
+                          className="rounded bg-red-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section
+            className={`relative min-w-0 rounded-lg border bg-white p-4 shadow-sm ${testCasesColumnClass}`}
+          >
+            <Image
+              src={
+                collapsedSuites
+                  ? "/images/icon2.png"
+                  : "/images/icon1.png"
+              }
+              alt={collapsedSuites ? "Ouvrir Test Suites" : "Fermer Test Suites"}
+              title={collapsedSuites ? "Ouvrir Test Suites" : "Fermer Test Suites"}
+              width={40}
+              height={40}
+              onClick={() => setCollapsedSuites((prev) => !prev)}
+              className={`${arrowButtonClass} ${collapsedSuites ? "top-24" : "top-12"} hidden xl:block`}
+            />
+            <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
               <input
                 type="text"
-                placeholder="Titre du test case"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Recherche par titre ou description"
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="min-w-0 flex-1 rounded border px-3 py-2"
+                disabled={!selectedSuite}
+              />
+
+              <select
+                value={statusFilter}
+                onChange={(e) => handleStatusFilterChange(e.target.value)}
+                className="rounded border px-3 py-2"
+                disabled={!selectedSuite}
+              >
+                <option value="ALL">Tous statuts</option>
+                <option value="DRAFT">DRAFT</option>
+                <option value="READY">READY</option>
+                <option value="DEPRECATED">DEPRECATED</option>
+              </select>
+
+              <select
+                value={priorityFilter}
+                onChange={(e) => handlePriorityFilterChange(e.target.value)}
+                className="rounded border px-3 py-2"
+                disabled={!selectedSuite}
+              >
+                <option value="ALL">Toutes priorités</option>
+                <option value="LOW">LOW</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="HIGH">HIGH</option>
+                <option value="CRITICAL">CRITICAL</option>
+              </select>
+
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="rounded border px-3 py-2"
+                disabled={!selectedSuite}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+
+              <button
+                type="button"
+                className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+                disabled={!selectedSuite}
+                onClick={openCreateModal}
+              >
+                New Test Case
+              </button>
+            </div>
+
+            <div className="mb-4 min-w-0">
+              <h2 className="truncate text-xl font-semibold">
+                {selectedSuite ? `Test Cases — ${selectedSuite.name}` : "Test Cases"}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {selectedProject
+                  ? `Projet actif : ${selectedProject.name}`
+                  : "Aucun projet sélectionné"}
+              </p>
+            </div>
+
+            {!selectedSuite ? (
+              <p className="text-gray-500">
+                Choisis une suite pour afficher ses cas de test.
+              </p>
+            ) : loadingTestCases ? (
+              <p>Chargement des cas de test...</p>
+            ) : filteredTestCases.length === 0 ? (
+              <p>Aucun cas de test trouvé.</p>
+            ) : (
+              <div className="space-y-4">
+                {paginatedTestCases.map((testCase, index) => (
+                  <div
+                    key={testCase.id}
+                    className={`rounded border ${
+                      expandedId === testCase.id
+                        ? "border-blue-300 bg-blue-50"
+                        : "bg-white"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4 p-4">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(testCase.id)}
+                          className="mt-1 flex h-8 w-8 items-center justify-center rounded border text-sm hover:bg-gray-100"
+                        >
+                          {expandedId === testCase.id ? "▾" : "▸"}
+                        </button>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-500">
+                              {(currentPage - 1) * itemsPerPage + index + 1}
+                            </span>
+                            <h3 className="min-w-0 truncate text-xl font-semibold">
+                              {testCase.title}
+                            </h3>
+                          </div>
+
+                          <p className="mt-1 break-words text-gray-600">
+                            {testCase.description || "Pas de description"}
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-2 py-1 text-xs font-medium ${getStatusClass(
+                                testCase.status
+                              )}`}
+                            >
+                              {testCase.status}
+                            </span>
+
+                            <span
+                              className={`rounded-full border px-2 py-1 text-xs font-medium ${getPriorityClass(
+                                testCase.priority
+                              )}`}
+                            >
+                              {testCase.priority}
+                            </span>
+
+                            <span className="text-sm text-gray-500">
+                              {testCase.steps?.length || 0} step(s)
+                            </span>
+
+                            <span className="text-sm text-gray-500">
+                              {new Date(testCase.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(testCase.id)}
+                          className="rounded bg-slate-700 px-3 py-2 text-sm text-white"
+                        >
+                          {expandedId === testCase.id ? "Réduire" : "Voir"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(testCase)}
+                          className="rounded bg-yellow-500 px-3 py-2 text-sm text-white"
+                        >
+                          Modify
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicate(testCase.id)}
+                          className="rounded bg-indigo-600 px-3 py-2 text-sm text-white"
+                        >
+                          Duplicate
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(testCase.id)}
+                          disabled={deleting}
+                          className="rounded bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    {expandedId === testCase.id && (
+                      <div className="border-t bg-gray-50 p-4">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          <div className="rounded border bg-white p-4">
+                            <h4 className="mb-2 font-semibold">Description</h4>
+                            <p className="break-words text-gray-700">
+                              {testCase.description || "-"}
+                            </p>
+                          </div>
+
+                          <div className="rounded border bg-white p-4">
+                            <h4 className="mb-2 font-semibold">Expected global result</h4>
+                            <p className="break-words text-gray-700">
+                              {testCase.expected || "-"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 rounded border bg-white p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <h4 className="font-semibold">Test Steps</h4>
+                            <div className="text-sm text-gray-500">
+                              Updated: {new Date(testCase.updatedAt).toLocaleString()}
+                            </div>
+                          </div>
+
+                          {testCase.steps?.length ? (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full border">
+                                <thead>
+                                  <tr className="bg-gray-50">
+                                    <th className="border px-3 py-2 text-left">#</th>
+                                    <th className="border px-3 py-2 text-left">Action</th>
+                                    <th className="border px-3 py-2 text-left">
+                                      Expected result
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {testCase.steps.map((step: TestStep) => (
+                                    <tr key={step.id}>
+                                      <td className="border px-3 py-2">
+                                        {step.stepOrder}
+                                      </td>
+                                      <td className="border px-3 py-2">{step.action}</td>
+                                      <td className="border px-3 py-2">
+                                        {step.expected || "-"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">Aucun step</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-gray-600">
+                    {filteredTestCases.length} résultat(s)
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                      className="rounded border px-3 py-1 disabled:opacity-50"
+                    >
+                      Précédent
+                    </button>
+
+                    <span className="text-sm">
+                      Page {currentPage} / {totalPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                      className="rounded border px-3 py-1 disabled:opacity-50"
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+
+      {isCreateSuiteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Créer une suite</h2>
+              <button
+                type="button"
+                onClick={closeCreateSuiteModal}
+                className="rounded border px-3 py-1"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSuite} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Nom de la suite"
+                value={suiteName}
+                onChange={(e) => setSuiteName(e.target.value)}
                 className="w-full rounded border px-3 py-2"
               />
 
               <textarea
                 placeholder="Description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={suiteDescription}
+                onChange={(e) => setSuiteDescription(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+                rows={3}
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeCreateSuiteModal}
+                  className="rounded border px-4 py-2"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={creatingSuite}
+                  className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
+                >
+                  {creatingSuite ? "Création..." : "Créer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingSuite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Modifier la suite</h2>
+              <button
+                type="button"
+                onClick={closeEditSuiteModal}
+                className="rounded border px-3 py-1"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSuite} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Nom de la suite"
+                value={editSuiteName}
+                onChange={(e) => setEditSuiteName(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+              />
+
+              <textarea
+                placeholder="Description"
+                value={editSuiteDescription}
+                onChange={(e) => setEditSuiteDescription(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+                rows={3}
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditSuiteModal}
+                  className="rounded border px-4 py-2"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={updatingSuite}
+                  className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
+                >
+                  {updatingSuite ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Créer un test case</h2>
+              <button
+                type="button"
+                onClick={closeCreateModal}
+                className="rounded border px-3 py-1"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTestCase} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Titre du test case"
+                value={createTitle}
+                onChange={(e) => setCreateTitle(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+              />
+
+              <textarea
+                placeholder="Description"
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
                 className="w-full rounded border px-3 py-2"
                 rows={3}
               />
 
               <textarea
                 placeholder="Expected global result"
-                value={expected}
-                onChange={(e) => setExpected(e.target.value)}
+                value={createExpected}
+                onChange={(e) => setCreateExpected(e.target.value)}
                 className="w-full rounded border px-3 py-2"
                 rows={2}
               />
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <select
-                  value={status}
+                  value={createStatus}
                   onChange={(e) =>
-                    setStatus(
-                      e.target.value as "DRAFT" | "READY" | "DEPRECATED",
+                    setCreateStatus(
+                      e.target.value as "DRAFT" | "READY" | "DEPRECATED"
                     )
                   }
                   className="rounded border px-3 py-2"
@@ -262,14 +1160,10 @@ export default function TestCasesPage() {
                 </select>
 
                 <select
-                  value={priority}
+                  value={createPriority}
                   onChange={(e) =>
-                    setPriority(
-                      e.target.value as
-                        | "LOW"
-                        | "MEDIUM"
-                        | "HIGH"
-                        | "CRITICAL",
+                    setCreatePriority(
+                      e.target.value as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
                     )
                   }
                   className="rounded border px-3 py-2"
@@ -286,23 +1180,23 @@ export default function TestCasesPage() {
                   <h3 className="font-medium">Test Steps</h3>
                   <button
                     type="button"
-                    onClick={addStep}
-                    className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
+                    onClick={addCreateStep}
+                    className="rounded bg-blue-600 px-3 py-2 text-white"
                   >
                     + Add Step
                   </button>
                 </div>
 
-                {steps.map((step, index) => (
+                {createSteps.map((step, index) => (
                   <div key={index} className="space-y-3 rounded-lg border p-4">
                     <div className="flex items-center justify-between">
                       <p className="font-medium">Step {index + 1}</p>
 
-                      {steps.length > 1 && (
+                      {createSteps.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => removeStep(index)}
-                          className="rounded bg-red-600 px-3 py-1 text-white hover:bg-red-700"
+                          onClick={() => removeCreateStep(index)}
+                          className="rounded bg-red-600 px-3 py-1 text-white"
                         >
                           Delete
                         </button>
@@ -313,7 +1207,7 @@ export default function TestCasesPage() {
                       placeholder="Action"
                       value={step.action}
                       onChange={(e) =>
-                        handleStepChange(index, "action", e.target.value)
+                        handleCreateStepChange(index, "action", e.target.value)
                       }
                       className="w-full rounded border px-3 py-2"
                       rows={2}
@@ -323,7 +1217,7 @@ export default function TestCasesPage() {
                       placeholder="Expected result"
                       value={step.expected}
                       onChange={(e) =>
-                        handleStepChange(index, "expected", e.target.value)
+                        handleCreateStepChange(index, "expected", e.target.value)
                       }
                       className="w-full rounded border px-3 py-2"
                       rows={2}
@@ -332,108 +1226,172 @@ export default function TestCasesPage() {
                 ))}
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting || !selectedProjectId}
-                className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                {submitting ? "Ajout..." : "Créer le test case"}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="rounded border px-4 py-2"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
+                >
+                  {creating ? "Création..." : "Créer"}
+                </button>
+              </div>
             </form>
           </div>
+        </div>
+      )}
 
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold">
-              Liste des test cases
-              {selectedProject ? ` — ${selectedProject.name}` : ""}
-            </h2>
+      {editingTestCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Modifier le test case</h2>
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="rounded border px-3 py-1"
+              >
+                Fermer
+              </button>
+            </div>
 
-            {loadingTestCases ? (
-              <p>Chargement des test cases...</p>
-            ) : testCases.length === 0 ? (
-              <p>Aucun test case trouvé pour ce projet.</p>
-            ) : (
-              <div className="space-y-4">
-                {testCases.map((testCase) => (
-                  <div key={testCase.id} className="rounded-lg border p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold">
-                          {testCase.title}
-                        </h3>
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Titre du test case"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+              />
 
-                        {testCase.description && (
-                          <p className="mt-2 text-gray-700">
-                            {testCase.description}
-                          </p>
-                        )}
+              <textarea
+                placeholder="Description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+                rows={3}
+              />
 
-                        <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-600 md:grid-cols-2">
-                          <p>
-                            <strong>Status :</strong> {testCase.status}
-                          </p>
-                          <p>
-                            <strong>Priority :</strong> {testCase.priority}
-                          </p>
-                          <p className="md:col-span-2">
-                            <strong>Expected global :</strong>{" "}
-                            {testCase.expected || "-"}
-                          </p>
-                          <p>
-                            <strong>Créé le :</strong>{" "}
-                            {new Date(testCase.createdAt).toLocaleString()}
-                          </p>
-                          <p>
-                            <strong>Mis à jour :</strong>{" "}
-                            {new Date(testCase.updatedAt).toLocaleString()}
-                          </p>
-                        </div>
+              <textarea
+                placeholder="Expected global result"
+                value={editExpected}
+                onChange={(e) => setEditExpected(e.target.value)}
+                className="w-full rounded border px-3 py-2"
+                rows={2}
+              />
 
-                        <div className="mt-4">
-                          <p className="mb-2 font-medium">Steps :</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <select
+                  value={editStatus}
+                  onChange={(e) =>
+                    setEditStatus(
+                      e.target.value as "DRAFT" | "READY" | "DEPRECATED"
+                    )
+                  }
+                  className="rounded border px-3 py-2"
+                >
+                  <option value="DRAFT">DRAFT</option>
+                  <option value="READY">READY</option>
+                  <option value="DEPRECATED">DEPRECATED</option>
+                </select>
 
-                          {testCase.steps?.length ? (
-                            <div className="space-y-2">
-                              {testCase.steps.map((step) => (
-                                <div
-                                  key={step.id}
-                                  className="rounded border bg-gray-50 p-3"
-                                >
-                                  <p>
-                                    <strong>Step {step.stepOrder}:</strong>{" "}
-                                    {step.action}
-                                  </p>
-                                  <p className="text-sm text-gray-600">
-                                    <strong>Expected :</strong>{" "}
-                                    {step.expected || "-"}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500">
-                              Aucun step
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                <select
+                  value={editPriority}
+                  onChange={(e) =>
+                    setEditPriority(
+                      e.target.value as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+                    )
+                  }
+                  className="rounded border px-3 py-2"
+                >
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                </select>
+              </div>
 
-                      <div className="flex gap-2">
-                        <button className="rounded bg-yellow-500 px-3 py-2 text-white hover:bg-yellow-600">
-                          Modify
-                        </button>
-                        <button className="rounded bg-red-600 px-3 py-2 text-white hover:bg-red-700">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">Test Steps</h3>
+                  <button
+                    type="button"
+                    onClick={addEditStep}
+                    className="rounded bg-blue-600 px-3 py-2 text-white"
+                  >
+                    + Add Step
+                  </button>
+                </div>
+
+                {editSteps.map((step, index) => (
+                  <div key={index} className="space-y-3 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">Step {index + 1}</p>
+
+                      {editSteps.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeEditStep(index)}
+                          className="rounded bg-red-600 px-3 py-1 text-white"
+                        >
                           Delete
                         </button>
-                      </div>
+                      )}
                     </div>
+
+                    <textarea
+                      placeholder="Action"
+                      value={step.action}
+                      onChange={(e) =>
+                        handleEditStepChange(index, "action", e.target.value)
+                      }
+                      className="w-full rounded border px-3 py-2"
+                      rows={2}
+                    />
+
+                    <textarea
+                      placeholder="Expected result"
+                      value={step.expected}
+                      onChange={(e) =>
+                        handleEditStepChange(index, "expected", e.target.value)
+                      }
+                      className="w-full rounded border px-3 py-2"
+                      rows={2}
+                    />
                   </div>
                 ))}
               </div>
-            )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="rounded border px-4 py-2"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
+                >
+                  {updating ? "Enregistrement..." : "Enregistrer"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
       </div>
+
     </div>
   );
 }
