@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import {
   createTestCase as createTestCaseApi,
@@ -84,9 +85,11 @@ export const fetchTestCases = createAsyncThunk<
   TestCase[],
   string,
   { rejectValue: string }
->("testCases/fetchTestCases", async (suiteId, thunkAPI) => {
-  try {
-    return await getTestCases(suiteId);
+>("testCases/fetchTestCases", async ({suiteId, status, priority}: any, thunkAPI) => {
+  try {    
+    const result = await getTestCases(suiteId, {status, priority});
+    return result;
+    
   } catch (error) {
     return thunkAPI.rejectWithValue(
       error instanceof Error ? error.message : "Impossible de charger les cas de test"

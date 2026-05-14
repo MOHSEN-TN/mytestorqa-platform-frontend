@@ -23,6 +23,8 @@ import {
   TestStep,
   updateTestCase,
 } from "@/lib/slices/testCaseSlice";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/store";
 
 type StepForm = {
   action: string;
@@ -95,6 +97,9 @@ export default function TestCasesPage() {
     { action: "", expected: "" },
   ]);
 
+  const testCaseList = useSelector((item: RootState) => item.testCases.testCases)
+  console.log("testCaseList ",testCaseList);
+  
   const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -129,9 +134,10 @@ export default function TestCasesPage() {
       dispatch(clearTestCases());
       return;
     }
-
-    dispatch(fetchTestCases(selectedSuite.id));
-  }, [dispatch, selectedSuite?.id]);
+    console.log("helloooo ");
+    
+    dispatch(fetchTestCases({suiteId: selectedSuite.id, status: statusFilter, priority: priorityFilter}));
+  }, [dispatch, selectedSuite?.id, statusFilter, priorityFilter]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -164,28 +170,12 @@ export default function TestCasesPage() {
     resetFiltersPage();
   };
 
-  const filteredTestCases = useMemo(() => {
-    return testCases.filter((tc) => {
-      const matchesSearch =
-        tc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (tc.description ?? "").toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesStatus =
-        statusFilter === "ALL" ? true : tc.status === statusFilter;
-
-      const matchesPriority =
-        priorityFilter === "ALL" ? true : tc.priority === priorityFilter;
-
-      return matchesSearch && matchesStatus && matchesPriority;
-    });
-  }, [testCases, searchTerm, statusFilter, priorityFilter]);
-
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredTestCases.length / itemsPerPage)
+    Math.ceil(testCaseList.length / itemsPerPage)
   );
 
-  const paginatedTestCases = filteredTestCases.slice(
+  const paginatedTestCases = testCaseList.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -394,7 +384,7 @@ export default function TestCasesPage() {
 
     if (createTestCase.fulfilled.match(resultAction)) {
       closeCreateModal();
-      dispatch(fetchTestCases(selectedSuite.id));
+      dispatch(fetchTestCases({suiteId: selectedSuite.id, status: statusFilter, priority: priorityFilter}));
     }
   };
 
@@ -409,7 +399,7 @@ export default function TestCasesPage() {
     );
 
     if (duplicateTestCase.fulfilled.match(resultAction)) {
-      dispatch(fetchTestCases(selectedSuite.id));
+      dispatch(fetchTestCases({suiteId: selectedSuite.id, status: statusFilter, priority: priorityFilter}));
     }
   };
 
@@ -486,7 +476,7 @@ export default function TestCasesPage() {
 
     if (updateTestCase.fulfilled.match(resultAction)) {
       closeEditModal();
-      dispatch(fetchTestCases(selectedSuite.id));
+      dispatch(fetchTestCases({suiteId: selectedSuite.id, status: statusFilter, priority: priorityFilter}));
     }
   };
 
@@ -504,7 +494,7 @@ export default function TestCasesPage() {
     );
 
     if (deleteTestCase.fulfilled.match(resultAction)) {
-      dispatch(fetchTestCases(selectedSuite.id));
+      dispatch(fetchTestCases({suiteId: selectedSuite.id, status: statusFilter, priority: priorityFilter}));
     }
   };
 
@@ -533,6 +523,7 @@ export default function TestCasesPage() {
   if (loadingProjects) {
     return <div className="p-6">Chargement des projets...</div>;
   }
+console.log("testCaseList ", testCaseList);
 
   return (
     <div className="space-y-6">
@@ -802,7 +793,7 @@ export default function TestCasesPage() {
               </p>
             ) : loadingTestCases ? (
               <p>Chargement des cas de test...</p>
-            ) : filteredTestCases.length === 0 ? (
+            ) : testCaseList.length === 0 ? (
               <p>Aucun cas de test trouvé.</p>
             ) : (
               <div className="space-y-4">
@@ -967,7 +958,7 @@ export default function TestCasesPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-gray-600">
-                    {filteredTestCases.length} résultat(s)
+                    {testCaseList.length} résultat(s)
                   </p>
 
                   <div className="flex items-center gap-2">

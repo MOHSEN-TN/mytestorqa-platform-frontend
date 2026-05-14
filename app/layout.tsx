@@ -8,7 +8,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body>
+      <body cz-shortcut-listen="true">
         <ReduxProvider>{children}</ReduxProvider>
       </body>
     </html>
