@@ -41,6 +41,7 @@ import {
   Layers,
   FolderKanban,
 } from "lucide-react";
+import { useDebounce } from "@/hooks/useDebounce";
 
 type StepForm = { action: string; expected: string };
 
@@ -209,23 +210,43 @@ export default function TestCasesPage() {
   const [editStatus, setEditStatus] = useState<"DRAFT" | "READY" | "DEPRECATED">("DRAFT");
   const [editPriority, setEditPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "CRITICAL">("MEDIUM");
   const [editSteps, setEditSteps] = useState<StepForm[]>([{ action: "", expected: "" }]);
+// Remplacez toute la section des effets par ceci :
 
-  /* effects */
-  useEffect(() => { dispatch(fetchProjects()); }, [dispatch]);
-  useEffect(() => {
-    if (!selectedProject?.id) { dispatch(clearTestSuites()); dispatch(clearTestCases()); return; }
-    dispatch(fetchTestSuites(selectedProject.id));
-    dispatch(clearTestCases());
-  }, [dispatch, selectedProject?.id]);
-  useEffect(() => {
-    if (!selectedSuite?.id) { dispatch(clearTestCases()); return; }
-    dispatch(fetchTestCases({ suiteId: selectedSuite.id, status: statusFilter, priority: priorityFilter }));
-  }, [dispatch, selectedSuite?.id, statusFilter, priorityFilter]);
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
+const debouncedSearch = useDebounce(searchTerm, 500);
+
+useEffect(() => { 
+  dispatch(fetchProjects()); 
+}, [dispatch]);
+
+useEffect(() => {
+  if (!selectedProject?.id) { 
+    dispatch(clearTestSuites()); 
+    dispatch(clearTestCases()); 
+    return; 
+  }
+  dispatch(fetchTestSuites(selectedProject.id));
+  dispatch(clearTestCases());
+}, [dispatch, selectedProject?.id]);
+
+useEffect(() => {
+  if (!selectedSuite?.id) { 
+    dispatch(clearTestCases()); 
+    return; 
+  }
+  console.log("Fetching test cases with search:", debouncedSearch); // Pour debug
+  dispatch(fetchTestCases({ 
+    suiteId: selectedSuite.id, 
+    status: statusFilter, 
+    priority: priorityFilter,
+    search: debouncedSearch || undefined
+  }));
+}, [dispatch, selectedSuite?.id, statusFilter, priorityFilter, debouncedSearch]);
+
+useEffect(() => {
+  const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+  document.addEventListener("fullscreenchange", onChange);
+  return () => document.removeEventListener("fullscreenchange", onChange);
+}, []);
 
   const resetPage = () => { setCurrentPage(1); setExpandedId(null); };
   const totalPages = Math.max(1, Math.ceil(testCaseList.length / itemsPerPage));

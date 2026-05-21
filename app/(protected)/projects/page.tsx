@@ -1,263 +1,4 @@
-// "use client";
-
-// import { FormEvent, useEffect, useState } from "react";
-// import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-// import {
-//   createProject,
-//   deleteProject,
-//   duplicateProject,
-//   fetchProjects,
-//   setSelectedProject,
-//   updateProject,
-// } from "@/lib/slices/projectSlice";
-
-// export default function ProjectsPage() {
-//   const dispatch = useAppDispatch();
-
-//   const {
-//     projects,
-//     loading,
-//     creating,
-//     updating,
-//     deleting,
-//     error,
-//     selectedProject,
-//   } = useAppSelector((state) => state.projects);
-
-//   const [projectName, setProjectName] = useState("");
-
-//   const [editingProject, setEditingProject] = useState<{
-//     id: string;
-//     name: string;
-//   } | null>(null);
-//   const [editProjectName, setEditProjectName] = useState("");
-
-//   useEffect(() => {
-//     dispatch(fetchProjects());
-//   }, [dispatch]);
-
-//   const handleSubmit = async (e: FormEvent) => {
-//     e.preventDefault();
-
-//     const trimmedName = projectName.trim();
-//     if (!trimmedName) return;
-
-//     const resultAction = await dispatch(createProject({ name: trimmedName }));
-
-//     if (createProject.fulfilled.match(resultAction)) {
-//       setProjectName("");
-//       dispatch(fetchProjects());
-//     }
-//   };
-
-//   const openEditModal = (project: { id: string; name: string }) => {
-//     setEditingProject(project);
-//     setEditProjectName(project.name);
-//   };
-
-//   const closeEditModal = () => {
-//     setEditingProject(null);
-//     setEditProjectName("");
-//   };
-
-//   const handleUpdate = async (e: FormEvent) => {
-//     e.preventDefault();
-
-//     if (!editingProject) return;
-
-//     const trimmedName = editProjectName.trim();
-//     if (!trimmedName) return;
-
-//     const resultAction = await dispatch(
-//       updateProject({
-//         projectId: editingProject.id,
-//         name: trimmedName,
-//       })
-//     );
-
-//     if (updateProject.fulfilled.match(resultAction)) {
-//       closeEditModal();
-//       dispatch(fetchProjects());
-//     }
-//   };
-
-//   const handleDuplicate = async (projectId: string) => {
-//     const resultAction = await dispatch(duplicateProject(projectId));
-
-//     if (duplicateProject.fulfilled.match(resultAction)) {
-//       dispatch(fetchProjects());
-//     }
-//   };
-
-//   const handleDelete = async (projectId: string) => {
-//     const confirmed = window.confirm("Supprimer ce projet ?");
-//     if (!confirmed) return;
-
-//     const resultAction = await dispatch(deleteProject(projectId));
-
-//     if (deleteProject.fulfilled.match(resultAction)) {
-//       dispatch(fetchProjects());
-//     }
-//   };
-
-//   return (
-//     <div className="space-y-6">
-//       <div>
-//         <h1 className="text-3xl font-bold">Projects</h1>
-//         <p className="text-sm text-gray-600">
-//           Gérer les projets : ajout, modification, duplication, suppression.
-//         </p>
-//       </div>
-
-//       <section className="rounded-xl border bg-white p-4 shadow-sm">
-//         <h2 className="mb-4 text-xl font-semibold">Ajouter un nouveau projet</h2>
-
-//         <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-//           <input
-//             type="text"
-//             placeholder="Nom du projet"
-//             value={projectName}
-//             onChange={(e) => setProjectName(e.target.value)}
-//             className="flex-1 rounded-md border px-4 py-2"
-//           />
-//           <button
-//             type="submit"
-//             disabled={creating}
-//             className="rounded-md bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-//           >
-//             {creating ? "Ajout..." : "Ajouter"}
-//           </button>
-//         </form>
-
-//         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-//       </section>
-
-//       <section className="rounded-xl border bg-white p-4 shadow-sm">
-//         <h2 className="mb-4 text-xl font-semibold">Liste des projets</h2>
-
-//         {loading ? (
-//           <p>Chargement...</p>
-//         ) : projects.length === 0 ? (
-//           <p>Aucun projet trouvé.</p>
-//         ) : (
-//           <div className="space-y-4">
-//             {projects.map((project) => (
-//               <div
-//                 key={project.id}
-//                 className={`rounded-lg border p-4 ${
-//                   selectedProject?.id === project.id ? "border-blue-600" : ""
-//                 }`}
-//               >
-//                 <h3 className="break-words text-2xl font-semibold">{project.name}</h3>
-
-//                 {project.createdAt && (
-//                   <p className="text-sm text-gray-500">
-//                     Créé le : {new Date(project.createdAt).toLocaleString()}
-//                   </p>
-//                 )}
-
-//                 {project.members?.length ? (
-//                   <div className="mt-3">
-//                     <p className="font-medium">Membres :</p>
-//                     <ul className="list-disc pl-5">
-//                       {project.members.map((member, index) => (
-//                         <li key={`${member.email}-${index}`}>
-//                           {member.email} — {member.role}
-//                         </li>
-//                       ))}
-//                     </ul>
-//                   </div>
-//                 ) : null}
-
-//                 <div className="mt-4 flex flex-wrap gap-2">
-//                   <button
-//                     type="button"
-//                     onClick={() => dispatch(setSelectedProject(project))}
-//                     className="rounded-md bg-slate-700 px-4 py-2 text-white"
-//                   >
-//                     {selectedProject?.id === project.id ? "Projet actif" : "Choisir"}
-//                   </button>
-
-//                   <button
-//                     type="button"
-//                     onClick={() => openEditModal(project)}
-//                     className="rounded-md bg-yellow-500 px-4 py-2 text-white"
-//                   >
-//                     Modify
-//                   </button>
-
-//                   <button
-//                     type="button"
-//                     onClick={() => handleDuplicate(project.id)}
-//                     className="rounded-md bg-indigo-600 px-4 py-2 text-white"
-//                   >
-//                     Duplicate
-//                   </button>
-
-//                   <button
-//                     type="button"
-//                     onClick={() => handleDelete(project.id)}
-//                     disabled={deleting}
-//                     className="rounded-md bg-red-600 px-4 py-2 text-white disabled:opacity-50"
-//                   >
-//                     Delete
-//                   </button>
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         )}
-//       </section>
-
-//       {editingProject && (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-//           <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
-//             <div className="mb-4 flex items-center justify-between">
-//               <h2 className="text-2xl font-bold">Modifier le projet</h2>
-//               <button
-//                 type="button"
-//                 onClick={closeEditModal}
-//                 className="rounded border px-3 py-1"
-//               >
-//                 Fermer
-//               </button>
-//             </div>
-
-//             <form onSubmit={handleUpdate} className="space-y-4">
-//               <input
-//                 type="text"
-//                 placeholder="Nom du projet"
-//                 value={editProjectName}
-//                 onChange={(e) => setEditProjectName(e.target.value)}
-//                 className="w-full rounded border px-4 py-2"
-//               />
-
-//               <div className="flex justify-end gap-3">
-//                 <button
-//                   type="button"
-//                   onClick={closeEditModal}
-//                   className="rounded border px-4 py-2"
-//                 >
-//                   Annuler
-//                 </button>
-
-//                 <button
-//                   type="submit"
-//                   disabled={updating}
-//                   className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
-//                 >
-//                   {updating ? "Enregistrement..." : "Enregistrer"}
-//                 </button>
-//               </div>
-//             </form>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -270,7 +11,7 @@ import {
   setSelectedProject,
   updateProject,
 } from "@/lib/slices/projectSlice";
-import { Eye, Edit, X, Plus, Upload, Settings, Copy, CheckCheck } from "lucide-react";
+import { Eye, Edit, X, Plus, Upload, Settings, Copy, CheckCheck, AlertCircle } from "lucide-react";
 
 // Status badge helper
 function StatusBadge({ status }: { status: string }) {
@@ -306,6 +47,7 @@ export default function ProjectsPage() {
 
   // New project form
   const [showNewModal, setShowNewModal] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
   const [projectOwner, setProjectOwner] = useState("");
@@ -315,36 +57,77 @@ export default function ProjectsPage() {
   // Edit
   const [editingProject, setEditingProject] = useState<{ id: string; name: string } | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchProjects());
   }, [dispatch]);
 
+  // Sync redux error into modal error when creating
+  useEffect(() => {
+    if (error && showNewModal) {
+      setCreateError(error);
+    }
+  }, [error, showNewModal]);
+
+  // Sync redux error into edit modal error
+  useEffect(() => {
+    if (error && editingProject) {
+      setEditError(error);
+    }
+  }, [error, editingProject]);
+
+  const closeNewModal = () => {
+    setShowNewModal(false);
+    setCreateError(null);
+    setProjectName("");
+    setProjectDesc("");
+    setProjectOwner("");
+    setProjectStatus("");
+    setProjectAI("");
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setCreateError(null);
     const trimmedName = projectName.trim();
     if (!trimmedName) return;
     const resultAction = await dispatch(createProject({ name: trimmedName }));
     if (createProject.fulfilled.match(resultAction)) {
-      setProjectName("");
-      setProjectDesc("");
-      setProjectOwner("");
-      setProjectStatus("");
-      setProjectAI("");
-      setShowNewModal(false);
+      closeNewModal();
       dispatch(fetchProjects());
+    } else {
+      // Show error from rejected action payload inside the modal
+      const errMsg =
+        (resultAction as any)?.payload?.message ||
+        (resultAction as any)?.error?.message ||
+        "Impossible de créer le projet.";
+      setCreateError(errMsg);
     }
+  };
+
+  const closeEditModal = () => {
+    setEditingProject(null);
+    setEditProjectName("");
+    setEditError(null);
   };
 
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
+    setEditError(null);
     if (!editingProject) return;
     const trimmedName = editProjectName.trim();
     if (!trimmedName) return;
     const resultAction = await dispatch(updateProject({ projectId: editingProject.id, name: trimmedName }));
     if (updateProject.fulfilled.match(resultAction)) {
-      setEditingProject(null);
+      closeEditModal();
       dispatch(fetchProjects());
+    } else {
+      const errMsg =
+        (resultAction as any)?.payload?.message ||
+        (resultAction as any)?.error?.message ||
+        "Impossible de modifier le projet.";
+      setEditError(errMsg);
     }
   };
 
@@ -421,7 +204,6 @@ export default function ProjectsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      {/* Choisir / Projet actif */}
                       <button
                         onClick={() => dispatch(setSelectedProject(project))}
                         title={selectedProject?.id === project.id ? "Projet actif" : "Choisir"}
@@ -433,7 +215,6 @@ export default function ProjectsPage() {
                       >
                         <CheckCheck size={14} />
                       </button>
-                      {/* Voir */}
                       <button
                         onClick={() => dispatch(setSelectedProject(project))}
                         title="Voir"
@@ -441,15 +222,13 @@ export default function ProjectsPage() {
                       >
                         <Eye size={14} />
                       </button>
-                      {/* Modifier */}
                       <button
-                        onClick={() => { setEditingProject(project); setEditProjectName(project.name); }}
+                        onClick={() => { setEditingProject(project); setEditProjectName(project.name); setEditError(null); }}
                         title="Modifier"
                         className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-orange-500 hover:border-orange-200 transition-colors"
                       >
                         <Edit size={14} />
                       </button>
-                      {/* Dupliquer */}
                       <button
                         onClick={() => handleDuplicate(project.id)}
                         title="Dupliquer"
@@ -457,7 +236,6 @@ export default function ProjectsPage() {
                       >
                         <Copy size={14} />
                       </button>
-                      {/* Supprimer */}
                       <button
                         onClick={() => handleDelete(project.id)}
                         disabled={deleting}
@@ -473,17 +251,15 @@ export default function ProjectsPage() {
             </tbody>
           </table>
         )}
-        {error && <p className="px-6 pb-4 text-sm text-red-600">{error}</p>}
       </div>
 
-      {/* New Project Modal */}
-      <Modal open={showNewModal} onClose={() => setShowNewModal(false)}>
+      {/* ── New Project Modal ── */}
+      <Modal open={showNewModal} onClose={closeNewModal}>
         <div className="p-6">
-          {/* Modal header */}
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-bold text-gray-800">Ajouter un nouveau projet</h2>
             <button
-              onClick={() => setShowNewModal(false)}
+              onClick={closeNewModal}
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
             >
               <X size={16} />
@@ -496,7 +272,7 @@ export default function ProjectsPage() {
               <input
                 type="text"
                 value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
+                onChange={(e) => { setProjectName(e.target.value); setCreateError(null); }}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                 required
               />
@@ -539,10 +315,18 @@ export default function ProjectsPage() {
               />
             </div>
 
+            {/* ── Error inside the modal ── */}
+            {createError && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-600">{createError}</p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setShowNewModal(false)}
+                onClick={closeNewModal}
                 className="flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors"
               >
                 <X size={14} />
@@ -553,20 +337,20 @@ export default function ProjectsPage() {
                 disabled={creating}
                 className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
               >
-                Enregistrer
+                {creating ? "Enregistrement..." : "Enregistrer"}
               </button>
             </div>
           </form>
         </div>
       </Modal>
 
-      {/* Edit Modal */}
-      <Modal open={!!editingProject} onClose={() => setEditingProject(null)}>
+      {/* ── Edit Modal ── */}
+      <Modal open={!!editingProject} onClose={closeEditModal}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-bold text-gray-800">Modifier le projet</h2>
             <button
-              onClick={() => setEditingProject(null)}
+              onClick={closeEditModal}
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
             >
               <X size={16} />
@@ -578,15 +362,24 @@ export default function ProjectsPage() {
               <input
                 type="text"
                 value={editProjectName}
-                onChange={(e) => setEditProjectName(e.target.value)}
+                onChange={(e) => { setEditProjectName(e.target.value); setEditError(null); }}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                 required
               />
             </div>
+
+            {/* ── Error inside the edit modal ── */}
+            {editError && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-600">{editError}</p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setEditingProject(null)}
+                onClick={closeEditModal}
                 className="flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors"
               >
                 <X size={14} />

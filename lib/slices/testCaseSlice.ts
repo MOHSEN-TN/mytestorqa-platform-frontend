@@ -81,21 +81,20 @@ const initialState: TestCaseState = {
   error: null,
 };
 
-export const fetchTestCases = createAsyncThunk<
-  TestCase[],
-  string,
-  { rejectValue: string }
->("testCases/fetchTestCases", async ({suiteId, status, priority}: any, thunkAPI) => {
-  try {    
-    const result = await getTestCases(suiteId, {status, priority});
-    return result;
-    
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Impossible de charger les cas de test"
-    );
+interface FetchTestCasesParams {
+  suiteId: string;
+  status: string;
+  priority: string;
+  search?: string;
+}
+
+export const fetchTestCases = createAsyncThunk(
+  'testCases/fetchTestCases',
+  async ({ suiteId, status, priority, search }: FetchTestCasesParams) => {
+    const response = await getTestCases(suiteId, { status, priority, search });
+    return response;
   }
-});
+);
 
 export const createTestCase = createAsyncThunk<
   TestCase,

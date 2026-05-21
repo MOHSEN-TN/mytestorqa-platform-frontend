@@ -47,24 +47,30 @@ export type UpdateTestCasePayload = {
   }>;
 };
 
-export async function getTestCases(suiteId: string, data : { status: string, priority: string }): Promise<TestCase[]> {
+// testCaseApi.ts - Mettre à jour la fonction getTestCases
+export async function getTestCases(
+  suiteId: string, 
+  data: { status: string; priority: string; search?: string }
+): Promise<TestCase[]> {
   const res = await fetch(`${API_URL}/suites/${suiteId}/testcases/by-pagination`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ status: data.status, priority: data.priority }),
+    body: JSON.stringify({ 
+      status: data.status, 
+      priority: data.priority,
+      search: data.search || undefined
+    }),
   });
   
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || "Erreur récupération test cases");
   }
-  const result = await res.json();
-  console.log("rùljcopsdfc ", result);
   
-  return result;
+  return res.json();
 }
 
 export async function getTestCase(

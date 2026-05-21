@@ -2,7 +2,47 @@
 
 import { useState } from "react";
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-
+  /* password field with toggle */
+  function PasswordField({
+    label,
+    value,
+    onChange,
+    show,
+    onToggle,
+    placeholder,
+  }: {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    show: boolean;
+    onToggle: () => void;
+    placeholder?: string;
+  }) {
+    return (
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+          {label}
+        </label>
+        <div className="relative">
+          <input
+            type={show ? "text" : "password"}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder ?? "••••••••"}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
+          />
+          <button
+            type="button"
+            onClick={onToggle}
+            tabIndex={-1}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {show ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+      </div>
+    );
+  }
 export default function SettingsPage() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -56,47 +96,7 @@ export default function SettingsPage() {
     }
   }
 
-  /* password field with toggle */
-  function PasswordField({
-    label,
-    value,
-    onChange,
-    show,
-    onToggle,
-    placeholder,
-  }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    show: boolean;
-    onToggle: () => void;
-    placeholder?: string;
-  }) {
-    return (
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-          {label}
-        </label>
-        <div className="relative">
-          <input
-            type={show ? "text" : "password"}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder ?? "••••••••"}
-            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 pr-10 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition"
-          />
-          <button
-            type="button"
-            onClick={onToggle}
-            tabIndex={-1}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            {show ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-6">
