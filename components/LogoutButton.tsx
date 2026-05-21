@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LogoutButton() {
@@ -20,11 +21,8 @@ export default function LogoutButton() {
   };
 
   return (
-    <button
-      onClick={handleLogout}
-      className="rounded border px-4 py-2 text-sm hover:bg-gray-100"
-    >
-      Logout
+    <button onClick={handleLogout} className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-700 transition-colors">
+      <ExternalLink size={16} />
     </button>
   );
 }
