@@ -61,19 +61,27 @@ export default function ProjectsPage() {
   const [editError, setEditError] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
-  const LIMIT = 5;
+  const [limit, setLimit] = useState(5); // État pour la limite par page
 
   // Remplacez le useEffect existant
   useEffect(() => {
     const timer = setTimeout(() => {
-      dispatch(fetchProjects({ name: search || undefined, page, limit: LIMIT }));
+      dispatch(fetchProjects({ name: search || undefined, page, limit: limit === -1 ? pagination.total : limit }));
     }, 400);
     return () => clearTimeout(timer);
-  }, [search, page, dispatch]);
+  }, [search, page, limit, dispatch]);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
     setPage(1);
   };
+
+  // Gestionnaire pour changer la limite
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+  };
+
   // Sync redux error into modal error when creating
   useEffect(() => {
     if (error && showNewModal) {
@@ -122,86 +130,89 @@ export default function ProjectsPage() {
     setEditProjectName("");
     setEditError(null);
   };
-const handleExport = () => {
-  const cols = ["id", "name", "description", "status"] as const;
-  const header = cols.join(",");
-  const rows = projects.map((p) =>
-    cols.map((c) => JSON.stringify(String((p as any)[c] ?? ""))).join(",")
-  );
-  const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "projets.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-};
-const fileInputRef = useRef<HTMLInputElement>(null);
 
-const parseCSV = (text: string) => {
-  const lines = text.trim().split(/\r?\n/);
-  const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim().toLowerCase());
-  return lines.slice(1).map((line) => {
-    const vals = line.match(/(".*?"|[^,]+)/g) ?? [];
-    const obj: Record<string, string> = {};
-    headers.forEach((h, i) => (obj[h] = (vals[i] ?? "").replace(/"/g, "").trim()));
-    return obj;
-  }).filter((r) => r.name);
-};
+  const handleExport = () => {
+    const cols = ["id", "name", "description", "status"] as const;
+    const header = cols.join(",");
+    const rows = projects.map((p) =>
+      cols.map((c) => JSON.stringify(String((p as any)[c] ?? ""))).join(",")
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "projets.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-const handleImportFile = async (file: File) => {
-  const ext = file.name.split(".").pop()?.toLowerCase();
-  const text = await file.text();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  let data: Record<string, string>[];
-  try {
-    if (ext === "json") data = JSON.parse(text);
-    else if (ext === "csv") data = parseCSV(text);
-    else return;
-  } catch {
-    alert("Fichier invalide ou mal formaté.");
-    return;
-  }
+  const parseCSV = (text: string) => {
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim().toLowerCase());
+    return lines.slice(1).map((line) => {
+      const vals = line.match(/(".*?"|[^,]+)/g) ?? [];
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => (obj[h] = (vals[i] ?? "").replace(/"/g, "").trim()));
+      return obj;
+    }).filter((r) => r.name);
+  };
 
-  const validRows = data.filter((r) => r.name?.trim());
-  if (validRows.length === 0) {
-    alert("Aucun projet valide trouvé dans le fichier.");
-    return;
-  }
+  const handleImportFile = async (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const text = await file.text();
 
-  // Vérifie les doublons avec les projets existants
-  const existingNames = new Set(projects.map((p) => p.name.trim().toLowerCase()));
-  const duplicates: string[] = [];
-  const toImport: Record<string, string>[] = [];
-
-  for (const row of validRows) {
-    if (existingNames.has(row.name.trim().toLowerCase())) {
-      duplicates.push(row.name.trim());
-    } else {
-      toImport.push(row);
+    let data: Record<string, string>[];
+    try {
+      if (ext === "json") data = JSON.parse(text);
+      else if (ext === "csv") data = parseCSV(text);
+      else return;
+    } catch {
+      alert("Fichier invalide ou mal formaté.");
+      return;
     }
-  }
 
-  // Affiche un résumé avant d'importer
-  let message = "";
-  if (duplicates.length > 0) {
-    message += `⚠️ ${duplicates.length} projet(s) déjà existant(s) et ignoré(s) :\n${duplicates.map((d) => `  • ${d}`).join("\n")}\n\n`;
-  }
-  if (toImport.length === 0) {
-    alert(message + "Aucun nouveau projet à importer.");
-    return;
-  }
-  message += `✅ ${toImport.length} nouveau(x) projet(s) à importer. Continuer ?`;
+    const validRows = data.filter((r) => r.name?.trim());
+    if (validRows.length === 0) {
+      alert("Aucun projet valide trouvé dans le fichier.");
+      return;
+    }
 
-  if (!window.confirm(message)) return;
+    // Vérifie les doublons avec les projets existants
+    const existingNames = new Set(projects.map((p) => p.name.trim().toLowerCase()));
+    const duplicates: string[] = [];
+    const toImport: Record<string, string>[] = [];
 
-  // Importe uniquement les projets sans doublon
-  for (const row of toImport) {
-    await dispatch(createProject({ name: row.name.trim() }));
-  }
-  dispatch(fetchProjects());
-};
+    for (const row of validRows) {
+      if (existingNames.has(row.name.trim().toLowerCase())) {
+        duplicates.push(row.name.trim());
+      } else {
+        toImport.push(row);
+      }
+    }
+
+    // Affiche un résumé avant d'importer
+    let message = "";
+    if (duplicates.length > 0) {
+      message += `⚠️ ${duplicates.length} projet(s) déjà existant(s) et ignoré(s) :\n${duplicates.map((d) => `  • ${d}`).join("\n")}\n\n`;
+    }
+    if (toImport.length === 0) {
+      alert(message + "Aucun nouveau projet à importer.");
+      return;
+    }
+    message += `✅ ${toImport.length} nouveau(x) projet(s) à importer. Continuer ?`;
+
+    if (!window.confirm(message)) return;
+
+    // Importe uniquement les projets sans doublon
+    for (const row of toImport) {
+      await dispatch(createProject({ name: row.name.trim() }));
+    }
+    dispatch(fetchProjects());
+  };
+
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
     setEditError(null);
@@ -231,6 +242,11 @@ const handleImportFile = async (file: File) => {
     const resultAction = await dispatch(deleteProject(projectId));
     if (deleteProject.fulfilled.match(resultAction)) dispatch(fetchProjects());
   };
+
+  // Calcul des valeurs d'affichage pour la pagination
+  const currentLimit = limit === -1 ? pagination.total : limit;
+  const startItem = (page - 1) * currentLimit + 1;
+  const endItem = Math.min(page * currentLimit, pagination.total);
 
   return (
     <div className="space-y-6">
@@ -289,6 +305,7 @@ const handleImportFile = async (file: File) => {
           />
         </div>
       </div>
+
       {/* Table */}
       <div className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
@@ -305,7 +322,7 @@ const handleImportFile = async (file: File) => {
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Description</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {projects.map((project, i) => (
@@ -372,57 +389,77 @@ const handleImportFile = async (file: File) => {
           </table>
         )}
       </div>
-{/* Pagination */}
-      <div className="flex items-center justify-between px-2 py-3">
-        <p className="text-sm text-gray-500">
-          {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, pagination.total)} sur{" "}
-          {pagination.total} projets
-        </p>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="flex flex-row items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <ChevronLeft />
-            Précédent
-          </button>
 
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-            .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - page) <= 1)
-            .reduce<(number | "...")[]>((acc, p, idx, arr) => {
-              if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
-              acc.push(p);
-              return acc;
-            }, [])
-            .map((p, idx) =>
-              p === "..." ? (
-                <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">…</span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => setPage(p as number)}
-                  className={`w-8 h-8 text-sm rounded-lg border transition-colors ${
-                    page === p
-                      ? "bg-blue-600 border-blue-600 text-white font-medium"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {p}
-                </button>
-              )
-            )}
-
-          <button
-            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-            disabled={page === pagination.totalPages}
-            className="flex flex-row items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            Suivant
-            <ChevronRight />
-          </button>
+      {/* Pagination avec option d'affichage */}
+      <div className="flex items-center justify-between px-2 py-3 flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          {/* Selecteur d'affichage par page */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Afficher :</span>
+            <select
+              value={limit}
+              onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+              className="text-sm rounded-lg border border-gray-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+            >
+              <option value={5}>5 par page</option>
+              <option value={15}>15 par page</option>
+              <option value={-1}>Tout afficher</option>
+            </select>
+          </div>
+          
+          <p className="text-sm text-gray-500">
+            {pagination.total > 0 ? `${startItem}–${endItem} sur ${pagination.total} projets` : "0 projet"}
+          </p>
         </div>
+        
+        {limit !== -1 && pagination.totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex flex-row items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft />
+              Précédent
+            </button>
+
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - page) <= 1)
+              .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, idx) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p as number)}
+                    className={`w-8 h-8 text-sm rounded-lg border transition-colors ${
+                      page === p
+                        ? "bg-blue-600 border-blue-600 text-white font-medium"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+            <button
+              onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+              disabled={page === pagination.totalPages}
+              className="flex flex-row items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Suivant
+              <ChevronRight />
+            </button>
+          </div>
+        )}
       </div>
+
       {/* ── New Project Modal ── */}
       <Modal open={showNewModal} onClose={closeNewModal}>
         <div className="p-6">
