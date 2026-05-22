@@ -15,8 +15,16 @@ export interface Project {
   members?: ProjectMember[];
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface ProjectState {
   projects: Project[];
+  pagination: PaginationMeta;
   selectedProject: Project | null;
   loading: boolean;
   creating: boolean;
@@ -27,6 +35,7 @@ interface ProjectState {
 
 const initialState: ProjectState = {
   projects: [],
+  pagination: { total: 0, page: 1, limit: 10, totalPages: 0 },
   selectedProject: null,
   loading: false,
   creating: false,
@@ -35,24 +44,37 @@ const initialState: ProjectState = {
   error: null,
 };
 
-export const fetchProjects = createAsyncThunk<
-  Project[],
-  string | undefined,   // ← était void
-  { rejectValue: string }
->("projects/fetchProjects", async (name, thunkAPI) => {
-  try {
-    const url = name
-      ? `${API_URL}/projects?name=${encodeURIComponent(name)}`
-      : `${API_URL}/projects`;
+// ─── Fetch (avec pagination) ───────────────────────────────────────────────
+interface FetchProjectsParams {
+  name?: string;
+  page?: number;
+  limit?: number;
+}
 
-    const response = await fetch(url, {
+interface FetchProjectsResponse {
+  data: Project[];
+  meta: PaginationMeta;
+}
+
+export const fetchProjects = createAsyncThunk<
+  FetchProjectsResponse,
+  FetchProjectsParams | undefined,
+  { rejectValue: string }
+>("projects/fetchProjects", async (params, thunkAPI) => {
+  try {
+    const query = new URLSearchParams();
+    if (params?.name)  query.set("name",  encodeURIComponent(params.name));
+    if (params?.page)  query.set("page",  String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+
+    const response = await fetch(`${API_URL}/projects?${query}`, {
       method: "GET",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) throw new Error("Impossible de charger les projets");
-    return await response.json();
+    return await response.json(); // { data, meta }
   } catch (error) {
     return thunkAPI.rejectWithValue(
       error instanceof Error ? error.message : "Erreur inconnue"
@@ -60,6 +82,7 @@ export const fetchProjects = createAsyncThunk<
   }
 });
 
+// ─── Create ────────────────────────────────────────────────────────────────
 export const createProject = createAsyncThunk<
   Project,
   { name: string },
@@ -69,16 +92,10 @@ export const createProject = createAsyncThunk<
     const response = await fetch(`${API_URL}/projects`, {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
-    if (!response.ok) {
-      throw new Error("Impossible de créer le projet");
-    }
-
+    if (!response.ok) throw new Error("Impossible de créer le projet");
     return await response.json();
   } catch (error) {
     return thunkAPI.rejectWithValue(
@@ -87,6 +104,7 @@ export const createProject = createAsyncThunk<
   }
 });
 
+// ─── Update ────────────────────────────────────────────────────────────────
 export const updateProject = createAsyncThunk<
   Project,
   { projectId: string; name: string },
@@ -96,16 +114,10 @@ export const updateProject = createAsyncThunk<
     const response = await fetch(`${API_URL}/projects/${payload.projectId}`, {
       method: "PATCH",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: payload.name }),
     });
-
-    if (!response.ok) {
-      throw new Error("Impossible de modifier le projet");
-    }
-
+    if (!response.ok) throw new Error("Impossible de modifier le projet");
     return await response.json();
   } catch (error) {
     return thunkAPI.rejectWithValue(
@@ -114,6 +126,7 @@ export const updateProject = createAsyncThunk<
   }
 });
 
+// ─── Duplicate ─────────────────────────────────────────────────────────────
 export const duplicateProject = createAsyncThunk<
   Project,
   string,
@@ -123,15 +136,9 @@ export const duplicateProject = createAsyncThunk<
     const response = await fetch(`${API_URL}/projects/${projectId}/duplicate`, {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
-
-    if (!response.ok) {
-      throw new Error("Impossible de dupliquer le projet");
-    }
-
+    if (!response.ok) throw new Error("Impossible de dupliquer le projet");
     return await response.json();
   } catch (error) {
     return thunkAPI.rejectWithValue(
@@ -140,6 +147,7 @@ export const duplicateProject = createAsyncThunk<
   }
 });
 
+// ─── Delete ────────────────────────────────────────────────────────────────
 export const deleteProject = createAsyncThunk<
   string,
   string,
@@ -149,15 +157,9 @@ export const deleteProject = createAsyncThunk<
     const response = await fetch(`${API_URL}/projects/${projectId}`, {
       method: "DELETE",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
-
-    if (!response.ok) {
-      throw new Error("Impossible de supprimer le projet");
-    }
-
+    if (!response.ok) throw new Error("Impossible de supprimer le projet");
     return projectId;
   } catch (error) {
     return thunkAPI.rejectWithValue(
@@ -166,6 +168,7 @@ export const deleteProject = createAsyncThunk<
   }
 });
 
+// ─── Slice ─────────────────────────────────────────────────────────────────
 const projectSlice = createSlice({
   name: "projects",
   initialState,
@@ -179,42 +182,45 @@ const projectSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // fetch
       .addCase(fetchProjects.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchProjects.fulfilled, (state, action) => {
         state.loading = false;
-        state.projects = action.payload;
+        state.projects   = action.payload.data;
+        state.pagination = action.payload.meta;
       })
       .addCase(fetchProjects.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload ?? "Erreur de chargement";
       })
 
+      // create
       .addCase(createProject.pending, (state) => {
         state.creating = true;
         state.error = null;
       })
-      .addCase(createProject.fulfilled, (state, action) => {
+      .addCase(createProject.fulfilled, (state) => {
+        // on recharge via fetchProjects pour avoir la pagination correcte
         state.creating = false;
-        state.projects.unshift(action.payload);
       })
       .addCase(createProject.rejected, (state, action) => {
         state.creating = false;
         state.error = action.payload ?? "Erreur de création";
       })
 
+      // update
       .addCase(updateProject.pending, (state) => {
         state.updating = true;
         state.error = null;
       })
       .addCase(updateProject.fulfilled, (state, action) => {
         state.updating = false;
-        state.projects = state.projects.map((project) =>
-          project.id === action.payload.id ? action.payload : project
+        state.projects = state.projects.map((p) =>
+          p.id === action.payload.id ? action.payload : p
         );
-
         if (state.selectedProject?.id === action.payload.id) {
           state.selectedProject = action.payload;
         }
@@ -224,32 +230,35 @@ const projectSlice = createSlice({
         state.error = action.payload ?? "Erreur de modification";
       })
 
+      // duplicate
       .addCase(duplicateProject.pending, (state) => {
         state.creating = true;
         state.error = null;
       })
-      .addCase(duplicateProject.fulfilled, (state, action) => {
+      .addCase(duplicateProject.fulfilled, (state) => {
         state.creating = false;
-        state.projects.unshift(action.payload);
       })
       .addCase(duplicateProject.rejected, (state, action) => {
         state.creating = false;
         state.error = action.payload ?? "Erreur de duplication";
       })
 
+      // delete
       .addCase(deleteProject.pending, (state) => {
         state.deleting = true;
         state.error = null;
       })
       .addCase(deleteProject.fulfilled, (state, action) => {
         state.deleting = false;
-        state.projects = state.projects.filter(
-          (project) => project.id !== action.payload
-        );
-
+        state.projects = state.projects.filter((p) => p.id !== action.payload);
         if (state.selectedProject?.id === action.payload) {
           state.selectedProject = null;
         }
+        // recalcule le total local en attendant le refetch
+        state.pagination.total = Math.max(0, state.pagination.total - 1);
+        state.pagination.totalPages = Math.ceil(
+          state.pagination.total / state.pagination.limit
+        );
       })
       .addCase(deleteProject.rejected, (state, action) => {
         state.deleting = false;

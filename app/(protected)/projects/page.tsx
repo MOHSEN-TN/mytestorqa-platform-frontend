@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
   createProject,
@@ -11,7 +11,7 @@ import {
   setSelectedProject,
   updateProject,
 } from "@/lib/slices/projectSlice";
-import { Eye, Edit, X, Plus, Upload, Settings, Copy, CheckCheck, AlertCircle, Search } from "lucide-react";
+import { Eye, Edit, X, Plus, Upload, Settings, Copy, CheckCheck, AlertCircle, Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
 
 // Status badge helper
 function StatusBadge({ status }: { status: string }) {
@@ -42,7 +42,7 @@ function Modal({ open, onClose, children }: { open: boolean; onClose: () => void
 
 export default function ProjectsPage() {
   const dispatch = useAppDispatch();
-  const { projects, loading, creating, updating, deleting, error, selectedProject } =
+  const { projects, loading, creating, updating, deleting, error, selectedProject, pagination } =
     useAppSelector((state) => state.projects);
 
   // New project form
@@ -60,13 +60,20 @@ export default function ProjectsPage() {
   const [editProjectName, setEditProjectName] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const LIMIT = 5;
+
+  // Remplacez le useEffect existant
   useEffect(() => {
     const timer = setTimeout(() => {
-      dispatch(fetchProjects(search || undefined));
+      dispatch(fetchProjects({ name: search || undefined, page, limit: LIMIT }));
     }, 400);
     return () => clearTimeout(timer);
-  }, [search, dispatch]);
-
+  }, [search, page, dispatch]);
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
   // Sync redux error into modal error when creating
   useEffect(() => {
     if (error && showNewModal) {
@@ -115,7 +122,86 @@ export default function ProjectsPage() {
     setEditProjectName("");
     setEditError(null);
   };
+const handleExport = () => {
+  const cols = ["id", "name", "description", "status"] as const;
+  const header = cols.join(",");
+  const rows = projects.map((p) =>
+    cols.map((c) => JSON.stringify(String((p as any)[c] ?? ""))).join(",")
+  );
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "projets.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+};
+const fileInputRef = useRef<HTMLInputElement>(null);
 
+const parseCSV = (text: string) => {
+  const lines = text.trim().split(/\r?\n/);
+  const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const vals = line.match(/(".*?"|[^,]+)/g) ?? [];
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => (obj[h] = (vals[i] ?? "").replace(/"/g, "").trim()));
+    return obj;
+  }).filter((r) => r.name);
+};
+
+const handleImportFile = async (file: File) => {
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  const text = await file.text();
+
+  let data: Record<string, string>[];
+  try {
+    if (ext === "json") data = JSON.parse(text);
+    else if (ext === "csv") data = parseCSV(text);
+    else return;
+  } catch {
+    alert("Fichier invalide ou mal formaté.");
+    return;
+  }
+
+  const validRows = data.filter((r) => r.name?.trim());
+  if (validRows.length === 0) {
+    alert("Aucun projet valide trouvé dans le fichier.");
+    return;
+  }
+
+  // Vérifie les doublons avec les projets existants
+  const existingNames = new Set(projects.map((p) => p.name.trim().toLowerCase()));
+  const duplicates: string[] = [];
+  const toImport: Record<string, string>[] = [];
+
+  for (const row of validRows) {
+    if (existingNames.has(row.name.trim().toLowerCase())) {
+      duplicates.push(row.name.trim());
+    } else {
+      toImport.push(row);
+    }
+  }
+
+  // Affiche un résumé avant d'importer
+  let message = "";
+  if (duplicates.length > 0) {
+    message += `⚠️ ${duplicates.length} projet(s) déjà existant(s) et ignoré(s) :\n${duplicates.map((d) => `  • ${d}`).join("\n")}\n\n`;
+  }
+  if (toImport.length === 0) {
+    alert(message + "Aucun nouveau projet à importer.");
+    return;
+  }
+  message += `✅ ${toImport.length} nouveau(x) projet(s) à importer. Continuer ?`;
+
+  if (!window.confirm(message)) return;
+
+  // Importe uniquement les projets sans doublon
+  for (const row of toImport) {
+    await dispatch(createProject({ name: row.name.trim() }));
+  }
+  dispatch(fetchProjects());
+};
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
     setEditError(null);
@@ -165,10 +251,29 @@ export default function ProjectsPage() {
           <Plus size={15} />
           Ajouter projet
         </button>
-        <button className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors">
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-colors"
+        >
+          <Download size={15} />
+          Exporter
+        </button>
+
+        {/* Bouton Import */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+        >
           <Upload size={15} />
           Importer
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.json"
+          className="hidden"
+          onChange={(e) => { if (e.target.files?.[0]) handleImportFile(e.target.files[0]); }}
+        />
         <button className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors">
           <Settings size={15} />
           Settings
@@ -178,7 +283,7 @@ export default function ProjectsPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearchChange}
             placeholder="Rechercher un projet..."
             className="pl-8 pr-4 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-56"
           />
@@ -267,7 +372,57 @@ export default function ProjectsPage() {
           </table>
         )}
       </div>
+{/* Pagination */}
+      <div className="flex items-center justify-between px-2 py-3">
+        <p className="text-sm text-gray-500">
+          {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, pagination.total)} sur{" "}
+          {pagination.total} projets
+        </p>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="flex flex-row items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft />
+            Précédent
+          </button>
 
+          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - page) <= 1)
+            .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+              if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p, idx) =>
+              p === "..." ? (
+                <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setPage(p as number)}
+                  className={`w-8 h-8 text-sm rounded-lg border transition-colors ${
+                    page === p
+                      ? "bg-blue-600 border-blue-600 text-white font-medium"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+
+          <button
+            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+            disabled={page === pagination.totalPages}
+            className="flex flex-row items-center justify-center px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Suivant
+            <ChevronRight />
+          </button>
+        </div>
+      </div>
       {/* ── New Project Modal ── */}
       <Modal open={showNewModal} onClose={closeNewModal}>
         <div className="p-6">
