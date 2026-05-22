@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-  /* password field with toggle */
+const API_URL = "http://localhost:3001";
+  
+/* password field with toggle */
   function PasswordField({
     label,
     value,
@@ -71,7 +73,7 @@ export default function SettingsPage() {
 
     try {
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/password`, {
+      const res = await fetch(`${API_URL}/users/password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

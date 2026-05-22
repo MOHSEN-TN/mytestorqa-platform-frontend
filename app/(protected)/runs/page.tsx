@@ -32,6 +32,7 @@ type ExecutionItem = {
   testCase: { id: string; title: string; description?: string | null; expected?: string | null; priority?: string; status?: string };
   steps?: ExecutionStepItem[];
 };
+const API_URL = "http://localhost:3001";
 
 /* ─── status maps ─── */
 const statusBadge: Record<ExecutionStatus, string> = {
@@ -160,7 +161,7 @@ export default function RunsPage() {
   const fetchExecutionItems = async (iterationId: string) => {
     try {
       setLoadingExecution(true); setRunError(null);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/iteration-items/iteration/${iterationId}`, { credentials: "include" });
+      const res = await fetch(`${API_URL}/iteration-items/iteration/${iterationId}`, { credentials: "include" });
       if (!res.ok) throw new Error();
       setExecutionItems(await res.json());
     } catch { setRunError("Impossible de charger les cas de test."); }
@@ -192,7 +193,7 @@ export default function RunsPage() {
     if (!selectedIteration?.id || !selectedSuiteIds.length) return;
     try {
       setAddingSuites(true); setRunMessage(null); setRunError(null);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/iterations/${selectedIteration.id}/suites`, {
+      const res = await fetch(`${API_URL}/iterations/${selectedIteration.id}/suites`, {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suiteIds: selectedSuiteIds }),
       });
@@ -207,7 +208,7 @@ export default function RunsPage() {
     if (!selectedIteration?.id) return;
     try {
       setRunning(true); setRunMessage(null); setRunError(null);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/iterations/${selectedIteration.id}/run`, { method: "POST", credentials: "include" });
+      const res = await fetch(`${API_URL}/iterations/${selectedIteration.id}/run`, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error();
       const data: RunResponse = await res.json();
       setRunMessage(data.message ?? (typeof data.count === "number" ? `${data.count} cas générés.` : "Exécution générée."));
@@ -220,7 +221,7 @@ export default function RunsPage() {
     if (!selectedIteration?.id) return;
     try {
       setSavingStepId(stepItemId); setRunError(null);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/iteration-step-items/${stepItemId}/status`, {
+      const res = await fetch(`${API_URL}/iteration-step-items/${stepItemId}/status`, {
         method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
