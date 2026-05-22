@@ -47,29 +47,35 @@ export type UpdateTestCasePayload = {
   }>;
 };
 
-// testCaseApi.ts - Mettre à jour la fonction getTestCases
+export type PaginatedTestCases = {
+  items: TestCase[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
 export async function getTestCases(
-  suiteId: string, 
-  data: { status: string; priority: string; search?: string }
-): Promise<TestCase[]> {
+  suiteId: string,
+  data: { status: string; priority: string; search?: string; page?: number; limit?: number }
+): Promise<PaginatedTestCases> {
   const res = await fetch(`${API_URL}/suites/${suiteId}/testcases/by-pagination`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ 
-      status: data.status, 
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      status: data.status,
       priority: data.priority,
-      search: data.search || undefined
+      search: data.search || undefined,
+      page: data.page ?? 1,
+      limit: data.limit ?? 10,
     }),
   });
-  
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || "Erreur récupération test cases");
   }
-  
+
   return res.json();
 }
 

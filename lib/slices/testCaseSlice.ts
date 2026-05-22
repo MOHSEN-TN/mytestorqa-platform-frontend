@@ -6,12 +6,8 @@ import {
   duplicateTestCase as duplicateTestCaseApi,
   getTestCases,
   updateTestCase as updateTestCaseApi,
+  type PaginatedTestCases,
 } from "@/lib/testcase-api";
-
-
-
-
-
 
 export interface TestStep {
   id: string;
@@ -43,10 +39,7 @@ export interface CreateTestCasePayload {
   expected?: string;
   status?: "DRAFT" | "READY" | "DEPRECATED";
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  steps?: Array<{
-    action: string;
-    expected?: string;
-  }>;
+  steps?: Array<{ action: string; expected?: string }>;
 }
 
 export interface UpdateTestCasePayload {
@@ -57,14 +50,22 @@ export interface UpdateTestCasePayload {
   expected?: string;
   status?: "DRAFT" | "READY" | "DEPRECATED";
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  steps?: Array<{
-    action: string;
-    expected?: string;
-  }>;
+  steps?: Array<{ action: string; expected?: string }>;
+}
+
+interface FetchTestCasesParams {
+  suiteId: string;
+  status: string;
+  priority: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 interface TestCaseState {
   testCases: TestCase[];
+  total: number;
+  totalPages: number;
   loading: boolean;
   creating: boolean;
   updating: boolean;
@@ -74,6 +75,8 @@ interface TestCaseState {
 
 const initialState: TestCaseState = {
   testCases: [],
+  total: 0,
+  totalPages: 1,
   loading: false,
   creating: false,
   updating: false,
@@ -81,18 +84,22 @@ const initialState: TestCaseState = {
   error: null,
 };
 
-interface FetchTestCasesParams {
-  suiteId: string;
-  status: string;
-  priority: string;
-  search?: string;
-}
+/* ── Thunks ── */
 
-export const fetchTestCases = createAsyncThunk(
-  'testCases/fetchTestCases',
-  async ({ suiteId, status, priority, search }: FetchTestCasesParams) => {
-    const response = await getTestCases(suiteId, { status, priority, search });
-    return response;
+export const fetchTestCases = createAsyncThunk<
+  PaginatedTestCases,
+  FetchTestCasesParams,
+  { rejectValue: string }
+>(
+  "testCases/fetchTestCases",
+  async ({ suiteId, status, priority, search, page, limit }, thunkAPI) => {
+    try {
+      return await getTestCases(suiteId, { status, priority, search, page, limit });
+    } catch (error) {
+      return thunkAPI.rejectWithValue(
+        error instanceof Error ? error.message : "Erreur de chargement"
+      );
+    }
   }
 );
 
@@ -153,6 +160,22 @@ export const deleteTestCase = createAsyncThunk<
   }
 });
 
+export const duplicateTestCase = createAsyncThunk<
+  TestCase,
+  { suiteId: string; testCaseId: string },
+  { rejectValue: string }
+>("testCases/duplicateTestCase", async (payload, thunkAPI) => {
+  try {
+    return await duplicateTestCaseApi(payload.suiteId, payload.testCaseId);
+  } catch (error) {
+    return thunkAPI.rejectWithValue(
+      error instanceof Error ? error.message : "Impossible de dupliquer le cas de test"
+    );
+  }
+});
+
+/* ── Slice ── */
+
 const testCaseSlice = createSlice({
   name: "testCases",
   initialState,
@@ -162,25 +185,31 @@ const testCaseSlice = createSlice({
     },
     clearTestCases(state) {
       state.testCases = [];
+      state.total = 0;
+      state.totalPages = 1;
       state.loading = false;
       state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
+      /* fetch */
       .addCase(fetchTestCases.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchTestCases.fulfilled, (state, action) => {
         state.loading = false;
-        state.testCases = action.payload;
+        state.testCases = action.payload.items;
+        state.total = action.payload.total;
+        state.totalPages = action.payload.totalPages;
       })
       .addCase(fetchTestCases.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload ?? "Erreur de chargement";
       })
 
+      /* create */
       .addCase(createTestCase.pending, (state) => {
         state.creating = true;
         state.error = null;
@@ -194,6 +223,7 @@ const testCaseSlice = createSlice({
         state.error = action.payload ?? "Erreur de création";
       })
 
+      /* update */
       .addCase(updateTestCase.pending, (state) => {
         state.updating = true;
         state.error = null;
@@ -209,6 +239,7 @@ const testCaseSlice = createSlice({
         state.error = action.payload ?? "Erreur de modification";
       })
 
+      /* delete */
       .addCase(deleteTestCase.pending, (state) => {
         state.deleting = true;
         state.error = null;
@@ -217,46 +248,25 @@ const testCaseSlice = createSlice({
         state.deleting = false;
         state.testCases = state.testCases.filter((tc) => tc.id !== action.payload);
       })
-
-      
-
-.addCase(duplicateTestCase.pending, (state) => {
-  state.creating = true;
-  state.error = null;
-})
-.addCase(duplicateTestCase.fulfilled, (state, action) => {
-  state.creating = false;
-  state.testCases.unshift(action.payload);
-})
-.addCase(duplicateTestCase.rejected, (state, action) => {
-  state.creating = false;
-  state.error = action.payload ?? "Erreur de duplication";
-})
-
-
-
-
       .addCase(deleteTestCase.rejected, (state, action) => {
         state.deleting = false;
         state.error = action.payload ?? "Erreur de suppression";
+      })
+
+      /* duplicate */
+      .addCase(duplicateTestCase.pending, (state) => {
+        state.creating = true;
+        state.error = null;
+      })
+      .addCase(duplicateTestCase.fulfilled, (state, action) => {
+        state.creating = false;
+        state.testCases.unshift(action.payload);
+      })
+      .addCase(duplicateTestCase.rejected, (state, action) => {
+        state.creating = false;
+        state.error = action.payload ?? "Erreur de duplication";
       });
-
-      
   },
-});
-
-export const duplicateTestCase = createAsyncThunk<
-  TestCase,
-  { suiteId: string; testCaseId: string },
-  { rejectValue: string }
->("testCases/duplicateTestCase", async (payload, thunkAPI) => {
-  try {
-    return await duplicateTestCaseApi(payload.suiteId, payload.testCaseId);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Impossible de dupliquer le cas de test"
-    );
-  }
 });
 
 export const { clearTestCaseError, clearTestCases } = testCaseSlice.actions;
