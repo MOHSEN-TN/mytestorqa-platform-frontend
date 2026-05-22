@@ -37,22 +37,21 @@ const initialState: ProjectState = {
 
 export const fetchProjects = createAsyncThunk<
   Project[],
-  void,
+  string | undefined,   // ← était void
   { rejectValue: string }
->("projects/fetchProjects", async (_, thunkAPI) => {
+>("projects/fetchProjects", async (name, thunkAPI) => {
   try {
-    const response = await fetch(`${API_URL}/projects`, {
+    const url = name
+      ? `${API_URL}/projects?name=${encodeURIComponent(name)}`
+      : `${API_URL}/projects`;
+
+    const response = await fetch(url, {
       method: "GET",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
 
-    if (!response.ok) {
-      throw new Error("Impossible de charger les projets");
-    }
-
+    if (!response.ok) throw new Error("Impossible de charger les projets");
     return await response.json();
   } catch (error) {
     return thunkAPI.rejectWithValue(

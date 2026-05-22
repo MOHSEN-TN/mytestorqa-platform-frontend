@@ -11,7 +11,7 @@ import {
   setSelectedProject,
   updateProject,
 } from "@/lib/slices/projectSlice";
-import { Eye, Edit, X, Plus, Upload, Settings, Copy, CheckCheck, AlertCircle } from "lucide-react";
+import { Eye, Edit, X, Plus, Upload, Settings, Copy, CheckCheck, AlertCircle, Search } from "lucide-react";
 
 // Status badge helper
 function StatusBadge({ status }: { status: string }) {
@@ -53,6 +53,7 @@ export default function ProjectsPage() {
   const [projectOwner, setProjectOwner] = useState("");
   const [projectStatus, setProjectStatus] = useState("");
   const [projectAI, setProjectAI] = useState("");
+  const [search, setSearch] = useState("");
 
   // Edit
   const [editingProject, setEditingProject] = useState<{ id: string; name: string } | null>(null);
@@ -60,8 +61,11 @@ export default function ProjectsPage() {
   const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchProjects());
-  }, [dispatch]);
+    const timer = setTimeout(() => {
+      dispatch(fetchProjects(search || undefined));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, dispatch]);
 
   // Sync redux error into modal error when creating
   useEffect(() => {
@@ -169,14 +173,25 @@ export default function ProjectsPage() {
           <Settings size={15} />
           Settings
         </button>
+        <div className="relative ml-auto">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un projet..."
+            className="pl-8 pr-4 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-56"
+          />
+        </div>
       </div>
-
       {/* Table */}
       <div className="rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <p className="p-6 text-gray-500">Chargement...</p>
         ) : projects.length === 0 ? (
-          <p className="p-6 text-gray-500">Aucun projet trouvé.</p>
+          <p className="p-6 text-gray-500">
+            {search ? `Aucun projet trouvé pour « ${search} ».` : "Aucun projet trouvé."}
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead>
