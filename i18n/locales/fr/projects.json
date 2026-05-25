@@ -1,0 +1,50 @@
+{
+  "title": "Projets",
+  "subtitle": "Liste des projets : chaque projet contient un nom et une description.",
+  "addProject": "Ajouter un projet",
+  "exportProjects": "Exporter",
+  "importProjects": "Importer",
+  "settings": "Paramètres",
+  "searchPlaceholder": "Rechercher un projet...",
+  "table": {
+    "name": "Nom du projet",
+    "description": "Description",
+    "status": "Statut",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Actif",
+    "inProgress": "En cours",
+    "planned": "Planifié",
+    "completed": "Terminé"
+  },
+  "modal": {
+    "createTitle": "Ajouter un nouveau projet",
+    "editTitle": "Modifier le projet",
+    "projectName": "Nom du projet",
+    "shortDescription": "Description courte",
+    "owner": "Responsable / Owner",
+    "projectStatus": "Statut du projet",
+    "qaOptions": "Options QA / IA"
+  },
+  "pagination": {
+    "showing": "Affichage",
+    "of": "sur",
+    "projects": "projets",
+    "itemsPerPage": "Afficher :",
+    "perPage": "par page",
+    "showAll": "Tout afficher"
+  },
+  "messages": {
+    "noProjects": "Aucun projet trouvé.",
+    "noSearchResults": "Aucun projet trouvé pour « {{search}} ».",
+    "deleteConfirm": "Supprimer ce projet ?",
+    "duplicateConfirm": "Dupliquer ce projet ?",
+    "createSuccess": "Projet créé avec succès",
+    "updateSuccess": "Projet modifié avec succès",
+    "deleteSuccess": "Projet supprimé avec succès",
+    "duplicateSuccess": "Projet dupliqué avec succès",
+    "importConfirm": "Importer {{count}} nouveau(x) projet(s) ?",
+    "importDuplicateWarning": "⚠️ {{count}} projet(s) déjà existant(s) et ignoré(s)"
+  }
+}

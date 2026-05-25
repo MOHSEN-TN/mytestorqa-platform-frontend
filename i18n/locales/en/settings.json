@@ -1,0 +1,27 @@
+{
+  "title": "Settings",
+  "subtitle": "Manage your preferences and account security.",
+  "password": {
+    "title": "Change Password",
+    "description": "Update your account password securely.",
+    "current": "Current Password",
+    "new": "New Password",
+    "confirm": "Confirm New Password",
+    "update": "Update Password",
+    "updating": "Updating...",
+    "success": "Password updated successfully",
+    "errors": {
+      "required": "Please fill in all fields",
+      "mismatch": "New password and confirm password do not match",
+      "invalid": "Current password is incorrect",
+      "network": "Network error. Please try again."
+    }
+  },
+  "language": {
+    "title": "Application Language",
+    "description": "Choose your preferred language for the interface.",
+    "changing": "Changing language...",
+    "success": "Language changed successfully",
+    "error": "Error changing language"
+  }
+}

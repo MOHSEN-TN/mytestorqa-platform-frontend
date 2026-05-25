@@ -1,16 +1,12 @@
-import "./globals.css";
-import ReduxProvider from "@/lib/store/provider";
+import { ReactNode } from 'react';
+import './globals.css';
 
+// Ce layout racine ne doit PAS avoir de html/body
+// Il sert uniquement à envelopper le layout dynamique
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="fr">
-      <body cz-shortcut-listen="true">
-        <ReduxProvider>{children}</ReduxProvider>
-      </body>
-    </html>
-  );
+}: {
+  children: ReactNode;
+}) {
+  return children;
 }
