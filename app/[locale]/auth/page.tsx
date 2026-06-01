@@ -28,7 +28,7 @@ const useTranslation = (_ns: string) => ({
       "errors.emailRequired": "Veuillez entrer votre adresse email.",
       "errors.otpRequired": "Veuillez entrer le code reçu par email.",
       "errors.otpInvalid": "Code incorrect ou expiré.",
-      footer: "© 2025 SMART QA · Tous droits réservés",
+      footer: `© ${new Date().getFullYear()} SMART QA · Tous droits réservés`,
       feature1: "Authentification sécurisée",
       feature2: "Gestion des tests et bugs",
       feature3: "Rapports et Agent IA",
