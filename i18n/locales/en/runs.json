@@ -1,0 +1,107 @@
+{
+  "title": "Test Execution",
+  "subtitle": "Project → Campaign → Iteration → Suites → Status",
+  "fullscreen": {
+    "enter": "Fullscreen",
+    "exit": "Exit",
+    "view": "Fullscreen view",
+    "close": "Close"
+  },
+  "projects": {
+    "title": "Projects",
+    "empty": "No projects.",
+    "loading": "Loading...",
+    "selectFirst": "Please select a project first.",
+    "createdAt": "Created"
+  },
+  "campaigns": {
+    "title": "Campaigns",
+    "subtitle": "Test campaigns",
+    "empty": "No campaigns.",
+    "loading": "Loading...",
+    "newPlaceholder": "New campaign",
+    "selectFirst": "Please select a campaign first."
+  },
+  "iterations": {
+    "title": "Iterations",
+    "subtitle": "Create and select an iteration",
+    "empty": "No iterations.",
+    "loading": "Loading...",
+    "newPlaceholder": "New iteration",
+    "selectFirst": "Please select a campaign first."
+  },
+  "execution": {
+    "title": "Execution",
+    "subtitle": "Select an iteration",
+    "selectFirst": "Select an iteration to start.",
+    "iteration": "Iteration",
+    "campaign": "Campaign",
+    "project": "Project",
+    "suitesTitle": "Suites to execute",
+    "noSuites": "No suites in this project.",
+    "addSuites": "Add suites",
+    "runTests": "Run tests",
+    "running": "Generating...",
+    "progress": "Progress",
+    "done": "done",
+    "remaining": "remaining",
+    "total": "Total",
+    "stats": {
+      "total": "Total",
+      "done": "Done",
+      "todo": "To do",
+      "success": "Success",
+      "failed": "Failed",
+      "blocked": "Blocked",
+      "skipped": "Skipped"
+    },
+    "statistics": {
+      "title": "Statistics",
+      "progress": "Progress",
+      "successRate": "Success rate",
+      "failureRate": "Failure rate",
+      "value": "Value",
+      "rate": "Rate"
+    },
+    "status": {
+      "title": "Execution status",
+      "TODO": "To do",
+      "SUCCESS": "Success",
+      "FAILED": "Failed",
+      "BLOCKED": "Blocked",
+      "SKIPPED": "Skipped"
+    },
+    "testCases": {
+      "title": "Test cases",
+      "items": "item(s)",
+      "loading": "Loading...",
+      "empty": "No cases. Add suites then run tests.",
+      "noDescription": "No description",
+      "noSteps": "No steps generated.",
+      "step": "Step",
+      "expected": "Expected"
+    },
+    "alerts": {
+      "suitesAdded": "Suites added. You can now run tests.",
+      "runGenerated": "{{count}} cases generated.",
+      "loadError": "Unable to load test cases.",
+      "addSuitesError": "Unable to add suites.",
+      "runError": "Unable to generate execution.",
+      "stepUpdateError": "Unable to update status."
+    }
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add"
+  },
+  "status": {
+    "TODO": "To do",
+    "SUCCESS": "Success",
+    "FAILED": "Failed",
+    "BLOCKED": "Blocked",
+    "SKIPPED": "Skipped"
+  }
+}

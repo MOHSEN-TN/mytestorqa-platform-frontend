@@ -1,0 +1,117 @@
+{
+  "title": "Test Management",
+  "subtitle": "Project → Suites → Test Cases",
+  "fullscreen": {
+    "enter": "Fullscreen",
+    "exit": "Exit",
+    "view": "Fullscreen view",
+    "close": "Close"
+  },
+  "projects": {
+    "title": "Projects",
+    "empty": "No projects found.",
+    "createdAt": "Created"
+  },
+  "suites": {
+    "title": "Test Suites",
+    "new": "New Suite",
+    "selectProjectFirst": "Please select a project first.",
+    "loading": "Loading...",
+    "empty": "No suites found.",
+    "noDescription": "No description",
+    "choose": "Choose",
+    "active": "Active suite",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this suite?",
+    "createModal": {
+      "title": "Create a test suite",
+      "name": "Suite name",
+      "description": "Description",
+      "submit": "Create"
+    },
+    "editModal": {
+      "title": "Edit suite",
+      "name": "Suite name",
+      "description": "Description",
+      "submit": "Save"
+    }
+  },
+  "testCases": {
+    "title": "Test Cases",
+    "new": "New Test Case",
+    "search": "Search...",
+    "statusFilter": "All statuses",
+    "priorityFilter": "All priorities",
+    "perPage": "{{count}} / page",
+    "selectSuiteFirst": "Select a suite to view its test cases.",
+    "loading": "Loading...",
+    "empty": "No test cases found.",
+    "noDescription": "No description",
+    "stepsCount": "{{count}} steps",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this test case?",
+    "descriptionLabel": "Description",
+    "expectedLabel": "Expected result",
+    "stepsLabel": "Test steps",
+    "updatedAt": "Updated",
+    "noSteps": "No steps.",
+    "results": "{{count}} result(s)",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "{{current}} / {{total}}",
+    "stepTable": {
+      "number": "#",
+      "action": "Action",
+      "expected": "Expected result"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "READY": "Ready",
+      "DEPRECATED": "Deprecated"
+    },
+    "priority": {
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "CRITICAL": "Critical"
+    }
+  },
+  "modals": {
+    "common": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "...",
+      "create": "Create"
+    },
+    "createTestCase": {
+      "title": "New test case",
+      "titleLabel": "Title",
+      "descriptionLabel": "Description",
+      "expectedLabel": "Expected global result",
+      "statusLabel": "Status",
+      "priorityLabel": "Priority",
+      "stepsLabel": "Test steps",
+      "addStep": "Add step",
+      "stepNumber": "Step {{number}}",
+      "stepAction": "Action",
+      "stepExpected": "Expected result"
+    },
+    "editTestCase": {
+      "title": "Edit test case",
+      "titleLabel": "Title",
+      "descriptionLabel": "Description",
+      "expectedLabel": "Expected global result",
+      "statusLabel": "Status",
+      "priorityLabel": "Priority"
+    }
+  },
+  "errors": {
+    "global": "An error occurred"
+  }
+}

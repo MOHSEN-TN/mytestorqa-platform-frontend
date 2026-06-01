@@ -1,4 +1,5 @@
-"use client";;
+"use client";
+
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import { fetchProjects, setSelectedProject } from "@/lib/slices/projectSlice";
@@ -15,6 +16,7 @@ import {
   XCircle, AlertCircle, SkipForward, Clock, ChevronDown, ChevronUp,
   AlertTriangle,
 } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type RunResponse = { count?: number; steps?: number; message?: string };
 type ExecutionStatus = "TODO" | "SUCCESS" | "FAILED" | "BLOCKED" | "SKIPPED";
@@ -32,41 +34,54 @@ type ExecutionItem = {
   testCase: { id: string; title: string; description?: string | null; expected?: string | null; priority?: string; status?: string };
   steps?: ExecutionStepItem[];
 };
+
 const API_URL = "http://localhost:3001";
 
-/* ─── status maps ─── */
-const statusBadge: Record<ExecutionStatus, string> = {
-  TODO:    "bg-gray-100 text-gray-600 border border-gray-200",
-  SUCCESS: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-  FAILED:  "bg-red-100 text-red-700 border border-red-200",
-  BLOCKED: "bg-orange-100 text-orange-700 border border-orange-200",
-  SKIPPED: "bg-blue-100 text-blue-700 border border-blue-200",
-};
-const statusBtn: Record<ExecutionStatus, string> = {
-  TODO:    "bg-gray-500 hover:bg-gray-600",
-  SUCCESS: "bg-emerald-600 hover:bg-emerald-700",
-  FAILED:  "bg-red-600 hover:bg-red-700",
-  BLOCKED: "bg-orange-500 hover:bg-orange-600",
-  SKIPPED: "bg-blue-600 hover:bg-blue-700",
-};
-const statusIcon: Record<ExecutionStatus, React.ReactNode> = {
-  TODO:    <Clock size={12} />,
-  SUCCESS: <CheckCircle2 size={12} />,
-  FAILED:  <XCircle size={12} />,
-  BLOCKED: <AlertCircle size={12} />,
-  SKIPPED: <SkipForward size={12} />,
-};
-const statusBar: Record<ExecutionStatus, string> = {
-  TODO: "bg-gray-400", SUCCESS: "bg-emerald-500", FAILED: "bg-red-500",
-  BLOCKED: "bg-orange-500", SKIPPED: "bg-blue-500",
-};
-const stepStatuses: ExecutionStatus[] = ["SUCCESS", "FAILED", "BLOCKED", "SKIPPED", "TODO"];
-const statusOrder: ExecutionStatus[] = ["SUCCESS", "FAILED", "BLOCKED", "SKIPPED", "TODO"];
-const statusLabels: Record<ExecutionStatus, string> = {
-  TODO: "To do", SUCCESS: "Success", FAILED: "Failed", BLOCKED: "Blocked", SKIPPED: "Skipped",
+/* ─── helpers with translation ─── */
+const getStatusBadge = (status: ExecutionStatus, t: (key: string) => string): string => {
+  const map: Record<ExecutionStatus, string> = {
+    TODO:    "bg-gray-100 text-gray-600 border border-gray-200",
+    SUCCESS: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    FAILED:  "bg-red-100 text-red-700 border border-red-200",
+    BLOCKED: "bg-orange-100 text-orange-700 border border-orange-200",
+    SKIPPED: "bg-blue-100 text-blue-700 border border-blue-200",
+  };
+  return map[status];
 };
 
-/* ─── helpers ─── */
+const getStatusBtnClass = (status: ExecutionStatus): string => {
+  const map: Record<ExecutionStatus, string> = {
+    TODO:    "bg-gray-500 hover:bg-gray-600",
+    SUCCESS: "bg-emerald-600 hover:bg-emerald-700",
+    FAILED:  "bg-red-600 hover:bg-red-700",
+    BLOCKED: "bg-orange-500 hover:bg-orange-600",
+    SKIPPED: "bg-blue-600 hover:bg-blue-700",
+  };
+  return map[status];
+};
+
+const getStatusIcon = (status: ExecutionStatus): React.ReactNode => {
+  const map: Record<ExecutionStatus, React.ReactNode> = {
+    TODO:    <Clock size={12} />,
+    SUCCESS: <CheckCircle2 size={12} />,
+    FAILED:  <XCircle size={12} />,
+    BLOCKED: <AlertCircle size={12} />,
+    SKIPPED: <SkipForward size={12} />,
+  };
+  return map[status];
+};
+
+const getStatusBarClass = (status: ExecutionStatus): string => {
+  const map: Record<ExecutionStatus, string> = {
+    TODO: "bg-gray-400", SUCCESS: "bg-emerald-500", FAILED: "bg-red-500",
+    BLOCKED: "bg-orange-500", SKIPPED: "bg-blue-500",
+  };
+  return map[status];
+};
+
+const stepStatuses: ExecutionStatus[] = ["SUCCESS", "FAILED", "BLOCKED", "SKIPPED", "TODO"];
+const statusOrder: ExecutionStatus[] = ["SUCCESS", "FAILED", "BLOCKED", "SKIPPED", "TODO"];
+
 function PanelHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: string }) {
   return (
     <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-50">
@@ -98,10 +113,10 @@ function CollapseBtn({ collapsed, onClick }: { collapsed: boolean; onClick: () =
 }
 
 function CreateInput({
-  value, onChange, onSubmit, placeholder, loading, disabled,
+  value, onChange, onSubmit, placeholder, loading, disabled, t,
 }: {
   value: string; onChange: (v: string) => void; onSubmit: (e: FormEvent<HTMLFormElement>) => void;
-  placeholder: string; loading: boolean; disabled: boolean;
+  placeholder: string; loading: boolean; disabled: boolean; t: (key: string) => string;
 }) {
   return (
     <form onSubmit={onSubmit} className="flex gap-2 px-3 pb-3">
@@ -118,6 +133,7 @@ function CreateInput({
 
 /* ═══════════════════════════════════════ */
 export default function RunsPage() {
+  const { t } = useTranslation("runs");
   const dispatch = useAppDispatch();
   const fullscreenRef = useRef<HTMLDivElement | null>(null);
 
@@ -164,7 +180,7 @@ export default function RunsPage() {
       const res = await fetch(`${API_URL}/iteration-items/iteration/${iterationId}`, { credentials: "include" });
       if (!res.ok) throw new Error();
       setExecutionItems(await res.json());
-    } catch { setRunError("Impossible de charger les cas de test."); }
+    } catch { setRunError(t("execution.alerts.loadError")); }
     finally { setLoadingExecution(false); }
   };
 
@@ -198,9 +214,9 @@ export default function RunsPage() {
         body: JSON.stringify({ suiteIds: selectedSuiteIds }),
       });
       if (!res.ok) throw new Error();
-      setRunMessage("Suites ajoutées. Tu peux maintenant lancer Run Tests.");
+      setRunMessage(t("execution.alerts.suitesAdded"));
       setSelectedSuiteIds([]);
-    } catch { setRunError("Impossible d'ajouter les suites."); }
+    } catch { setRunError(t("execution.alerts.addSuitesError")); }
     finally { setAddingSuites(false); }
   };
 
@@ -211,9 +227,12 @@ export default function RunsPage() {
       const res = await fetch(`${API_URL}/iterations/${selectedIteration.id}/run`, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error();
       const data: RunResponse = await res.json();
-      setRunMessage(data.message ?? (typeof data.count === "number" ? `${data.count} cas générés.` : "Exécution générée."));
+      const message = data.message ?? (typeof data.count === "number" 
+        ? t("execution.alerts.runGenerated", { count: data.count }) 
+        : t("execution.alerts.runGenerated", { count: 0 }));
+      setRunMessage(message);
       await fetchExecutionItems(selectedIteration.id);
-    } catch { setRunError("Impossible de générer l'exécution."); }
+    } catch { setRunError(t("execution.alerts.runError")); }
     finally { setRunning(false); }
   };
 
@@ -227,7 +246,7 @@ export default function RunsPage() {
       });
       if (!res.ok) throw new Error();
       await fetchExecutionItems(selectedIteration.id);
-    } catch { setRunError("Impossible de mettre à jour le statut."); }
+    } catch { setRunError(t("execution.alerts.stepUpdateError")); }
     finally { setSavingStepId(null); }
   };
 
@@ -256,13 +275,13 @@ export default function RunsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Test Execution</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Projet → Campagne → Itération → Suites → Statut</p>
+          <h1 className="text-2xl font-bold text-gray-800">{t("title")}</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{t("subtitle")}</p>
         </div>
         <button type="button" onClick={async () => {
           try { if (!document.fullscreenElement) await fullscreenRef.current?.requestFullscreen(); else await document.exitFullscreen(); } catch {}
         }} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm transition-colors">
-          {isFullscreen ? <><Minimize2 size={14} /> Quitter</> : <><Maximize2 size={14} /> Plein écran</>}
+          {isFullscreen ? <><Minimize2 size={14} /> {t("fullscreen.exit")}</> : <><Maximize2 size={14} /> {t("fullscreen.enter")}</>}
         </button>
       </div>
 
@@ -274,10 +293,10 @@ export default function RunsPage() {
       <div ref={fullscreenRef} className={isFullscreen ? "overflow-auto bg-gray-50 p-6 min-h-screen" : ""}>
         {isFullscreen && (
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold text-gray-700">Vue plein écran</h2>
+            <h2 className="text-lg font-semibold text-gray-700">{t("fullscreen.view")}</h2>
             <button type="button" onClick={async () => { try { await document.exitFullscreen(); } catch {} }}
               className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-white transition-colors">
-              <Minimize2 size={14} /> Fermer
+              <Minimize2 size={14} /> {t("fullscreen.close")}
             </button>
           </div>
         )}
@@ -287,10 +306,10 @@ export default function RunsPage() {
           {/* ── PROJECTS ── */}
           {!collapsedProjects && (
             <section className={`min-w-0 rounded-xl border border-gray-100 bg-white shadow-sm ${colSpan}`}>
-              <PanelHeader icon={<FolderKanban size={15} className="text-blue-500" />} title="Projects" />
+              <PanelHeader icon={<FolderKanban size={15} className="text-blue-500" />} title={t("projects.title")} />
               <div className="p-3 space-y-1.5">
-                {loadingProjects ? <p className="text-sm text-gray-400 px-2 py-4">Chargement...</p>
-                  : projects.length === 0 ? <p className="text-sm text-gray-400 px-2 py-4">Aucun projet.</p>
+                {loadingProjects ? <p className="text-sm text-gray-400 px-2 py-4">{t("projects.loading")}</p>
+                  : projects.length === 0 ? <p className="text-sm text-gray-400 px-2 py-4">{t("projects.empty")}</p>
                   : projects.map(p => {
                     const active = selectedProject?.id === p.id;
                     return (
@@ -311,18 +330,18 @@ export default function RunsPage() {
           {!collapsedCampaigns && (
             <section className={`relative min-w-0 rounded-xl border border-gray-100 bg-white shadow-sm ${colSpan}`}>
               <CollapseBtn collapsed={collapsedProjects} onClick={() => setCollapsedProjects(p => !p)} />
-              <PanelHeader icon={<Megaphone size={15} className="text-purple-500" />} title="Campaigns" subtitle="Campagnes de test" />
+              <PanelHeader icon={<Megaphone size={15} className="text-purple-500" />} title={t("campaigns.title")} subtitle={t("campaigns.subtitle")} />
               {!selectedProject ? (
-                <p className="text-sm text-gray-400 px-5 py-4">{"Choisis d'abord un projet."}</p>
+                <p className="text-sm text-gray-400 px-5 py-4">{t("campaigns.selectFirst")}</p>
               ) : (
                 <>
                   <div className="px-3 pt-3">
                     <CreateInput value={newCampaign} onChange={setNewCampaign} onSubmit={handleCreateCampaign}
-                      placeholder="Nouvelle campagne" loading={creatingCampaign} disabled={!selectedProject} />
+                      placeholder={t("campaigns.newPlaceholder")} loading={creatingCampaign} disabled={!selectedProject} t={t} />
                   </div>
                   <div className="px-3 pb-3 space-y-1.5">
-                    {loadingCampaigns ? <p className="text-sm text-gray-400 py-4">Chargement...</p>
-                      : campaigns.length === 0 ? <p className="text-sm text-gray-400 py-4">Aucune campagne.</p>
+                    {loadingCampaigns ? <p className="text-sm text-gray-400 py-4">{t("campaigns.loading")}</p>
+                      : campaigns.length === 0 ? <p className="text-sm text-gray-400 py-4">{t("campaigns.empty")}</p>
                       : campaigns.map(c => {
                         const active = selectedCampaign?.id === c.id;
                         return (
@@ -345,18 +364,18 @@ export default function RunsPage() {
           {!collapsedIterations && (
             <section className={`relative min-w-0 rounded-xl border border-gray-100 bg-white shadow-sm ${colSpan}`}>
               <CollapseBtn collapsed={collapsedCampaigns} onClick={() => setCollapsedCampaigns(p => !p)} />
-              <PanelHeader icon={<RefreshCw size={15} className="text-amber-500" />} title="Iterations" subtitle="Crée et sélectionne une itération" />
+              <PanelHeader icon={<RefreshCw size={15} className="text-amber-500" />} title={t("iterations.title")} subtitle={t("iterations.subtitle")} />
               {!selectedCampaign ? (
-                <p className="text-sm text-gray-400 px-5 py-4">{"Choisis d'abord une campagne."}</p>
+                <p className="text-sm text-gray-400 px-5 py-4">{t("iterations.selectFirst")}</p>
               ) : (
                 <>
                   <div className="px-3 pt-3">
                     <CreateInput value={newIteration} onChange={setNewIteration} onSubmit={handleCreateIteration}
-                      placeholder="Nouvelle itération" loading={creatingIteration} disabled={!selectedCampaign} />
+                      placeholder={t("iterations.newPlaceholder")} loading={creatingIteration} disabled={!selectedCampaign} t={t} />
                   </div>
                   <div className="px-3 pb-3 space-y-1.5">
-                    {loadingIterations ? <p className="text-sm text-gray-400 py-4">Chargement...</p>
-                      : iterations.length === 0 ? <p className="text-sm text-gray-400 py-4">Aucune itération.</p>
+                    {loadingIterations ? <p className="text-sm text-gray-400 py-4">{t("iterations.loading")}</p>
+                      : iterations.length === 0 ? <p className="text-sm text-gray-400 py-4">{t("iterations.empty")}</p>
                       : iterations.map(it => {
                         const active = selectedIteration?.id === it.id;
                         return (
@@ -378,29 +397,29 @@ export default function RunsPage() {
           {/* ── EXECUTION ── */}
           <section className={`relative min-w-0 rounded-xl border border-gray-100 bg-white shadow-sm ${colSpan}`}>
             <CollapseBtn collapsed={collapsedIterations} onClick={() => setCollapsedIterations(p => !p)} />
-            <PanelHeader icon={<FlaskConical size={15} className="text-blue-500" />} title="Execution"
-              subtitle={selectedIteration ? selectedIteration.name : "Sélectionne une itération"} />
+            <PanelHeader icon={<FlaskConical size={15} className="text-blue-500" />} title={t("execution.title")}
+              subtitle={selectedIteration ? selectedIteration.name : t("execution.subtitle")} />
 
             <div className="p-4 space-y-5">
               {!selectedIteration ? (
-                <p className="text-sm text-gray-400 py-6 text-center">Choisis une itération pour commencer.</p>
+                <p className="text-sm text-gray-400 py-6 text-center">{t("execution.selectFirst")}</p>
               ) : (
                 <>
                   {/* Context badge */}
                   <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-xs text-gray-500 space-y-0.5">
-                    <div><span className="font-semibold text-gray-700">Itération :</span> {selectedIteration.name}</div>
-                    <div><span className="font-semibold text-gray-700">Campagne :</span> {selectedCampaign?.name}</div>
-                    <div><span className="font-semibold text-gray-700">Projet :</span> {selectedProject?.name}</div>
+                    <div><span className="font-semibold text-gray-700">{t("execution.iteration")} :</span> {selectedIteration.name}</div>
+                    <div><span className="font-semibold text-gray-700">{t("execution.campaign")} :</span> {selectedCampaign?.name}</div>
+                    <div><span className="font-semibold text-gray-700">{t("execution.project")} :</span> {selectedProject?.name}</div>
                   </div>
 
                   {/* Suite selector */}
                   <div className="rounded-xl border border-gray-100 bg-gray-50/50 overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
-                      <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Suites à exécuter</span>
+                      <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">{t("execution.suitesTitle")}</span>
                     </div>
                     <div className="p-3 space-y-1.5">
-                      {loadingSuites ? <p className="text-sm text-gray-400">Chargement...</p>
-                        : testSuites.length === 0 ? <p className="text-sm text-gray-400">Aucune suite dans ce projet.</p>
+                      {loadingSuites ? <p className="text-sm text-gray-400">{t("projects.loading")}</p>
+                        : testSuites.length === 0 ? <p className="text-sm text-gray-400">{t("execution.noSuites")}</p>
                         : testSuites.map(suite => (
                           <label key={suite.id} className="flex items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors">
                             <input type="checkbox" checked={selectedSuiteIds.includes(suite.id)}
@@ -415,7 +434,7 @@ export default function RunsPage() {
                         disabled={!selectedSuiteIds.length || addingSuites}
                         className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-medium text-white disabled:opacity-40 transition-colors">
                         {addingSuites ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />}
-                        Ajouter les suites
+                        {t("execution.addSuites")}
                       </button>
                     </div>
                   </div>
@@ -424,7 +443,7 @@ export default function RunsPage() {
                   <button type="button" onClick={handleRunTests} disabled={running}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 py-2.5 text-sm font-semibold text-white disabled:opacity-50 transition-colors">
                     {running ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
-                    {running ? "Génération en cours..." : "Run Tests"}
+                    {running ? t("execution.running") : t("execution.runTests")}
                   </button>
 
                   {/* ── Dashboard ── */}
@@ -433,50 +452,50 @@ export default function RunsPage() {
                       {/* Progress bar */}
                       <div className="rounded-xl border border-gray-100 bg-white p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Progression</span>
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("execution.progress")}</span>
                           <span className="text-xs font-bold text-gray-700">{progress}%</span>
                         </div>
                         <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
                           <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} />
                         </div>
                         <div className="flex justify-between mt-1.5 text-xs text-gray-400">
-                          <span>{done} done</span>
-                          <span>{stats.todo} remaining</span>
+                          <span>{done} {t("execution.done")}</span>
+                          <span>{stats.todo} {t("execution.remaining")}</span>
                         </div>
                       </div>
 
                       {/* Stat grid */}
                       <div className="grid grid-cols-3 gap-2">
-                        <StatCard label="Total" value={stats.total} />
-                        <StatCard label="Done" value={done} />
-                        <StatCard label="To do" value={stats.todo} />
-                        <StatCard label="Success" value={stats.success} className="bg-emerald-50 border-emerald-100 text-emerald-700" />
-                        <StatCard label="Failed" value={stats.failed} className="bg-red-50 border-red-100 text-red-700" />
-                        <StatCard label="Blocked" value={stats.blocked} className="bg-orange-50 border-orange-100 text-orange-700" />
+                        <StatCard label={t("execution.stats.total")} value={stats.total} />
+                        <StatCard label={t("execution.stats.done")} value={done} />
+                        <StatCard label={t("execution.stats.todo")} value={stats.todo} />
+                        <StatCard label={t("execution.stats.success")} value={stats.success} className="bg-emerald-50 border-emerald-100 text-emerald-700" />
+                        <StatCard label={t("execution.stats.failed")} value={stats.failed} className="bg-red-50 border-red-100 text-red-700" />
+                        <StatCard label={t("execution.stats.blocked")} value={stats.blocked} className="bg-orange-50 border-orange-100 text-orange-700" />
                       </div>
 
                       {/* Stats table */}
                       <div className="rounded-xl border border-gray-100 overflow-hidden">
                         <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Statistics</span>
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("execution.statistics.title")}</span>
                         </div>
                         <table className="w-full text-xs">
                           <thead><tr className="border-b border-gray-50">
-                            <th className="text-left px-4 py-2 text-gray-400 font-semibold">Metric</th>
-                            <th className="text-left px-4 py-2 text-gray-400 font-semibold">Value</th>
-                            <th className="text-left px-4 py-2 text-gray-400 font-semibold">Rate</th>
-                          </tr></thead>
+                            <th className="text-left px-4 py-2 text-gray-400 font-semibold">{t("execution.statistics.value")}</th>
+                            <th className="text-left px-4 py-2 text-gray-400 font-semibold">{t("execution.statistics.value")}</th>
+                            <th className="text-left px-4 py-2 text-gray-400 font-semibold">{t("execution.statistics.rate")}</th>
+                           </tr></thead>
                           <tbody>
                             {[
-                              { label: "Progress", num: done, den: stats.total, rate: progress },
-                              { label: "Success rate", num: stats.success, den: stats.total, rate: successRate },
-                              { label: "Failure rate", num: stats.failed, den: stats.total, rate: failureRate },
+                              { label: t("execution.statistics.progress"), num: done, den: stats.total, rate: progress },
+                              { label: t("execution.statistics.successRate"), num: stats.success, den: stats.total, rate: successRate },
+                              { label: t("execution.statistics.failureRate"), num: stats.failed, den: stats.total, rate: failureRate },
                             ].map(row => (
                               <tr key={row.label} className="border-t border-gray-50">
                                 <td className="px-4 py-2 text-gray-600">{row.label}</td>
                                 <td className="px-4 py-2 text-gray-700 font-medium">{row.num}/{row.den}</td>
                                 <td className="px-4 py-2 text-gray-700 font-medium">{row.rate}%</td>
-                              </tr>
+                               </tr>
                             ))}
                           </tbody>
                         </table>
@@ -485,7 +504,7 @@ export default function RunsPage() {
                       {/* Status bars */}
                       <div className="rounded-xl border border-gray-100 overflow-hidden">
                         <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Execution status</span>
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("execution.status.title")}</span>
                         </div>
                         <div className="p-4 space-y-3">
                           {statusOrder.map(s => {
@@ -494,11 +513,11 @@ export default function RunsPage() {
                             return (
                               <div key={s}>
                                 <div className="flex justify-between text-xs mb-1">
-                                  <span className="text-gray-600 font-medium">{statusLabels[s]}</span>
+                                  <span className="text-gray-600 font-medium">{t(`status.${s}`)}</span>
                                   <span className="text-gray-400">{v} — {r}%</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                                  <div className={`h-full rounded-full transition-all ${statusBar[s]}`} style={{ width: `${r}%` }} />
+                                  <div className={`h-full rounded-full transition-all ${getStatusBarClass(s)}`} style={{ width: `${r}%` }} />
                                 </div>
                               </div>
                             );
@@ -511,14 +530,14 @@ export default function RunsPage() {
                   {/* ── Execution items ── */}
                   <div className="rounded-xl border border-gray-100 overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Cas de test</span>
-                      <span className="text-xs text-gray-400">{executionItems.length} item(s)</span>
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("execution.testCases.title")}</span>
+                      <span className="text-xs text-gray-400">{executionItems.length} {t("execution.testCases.items")}</span>
                     </div>
                     <div className="divide-y divide-gray-50">
                       {loadingExecution ? (
-                        <p className="text-sm text-gray-400 px-4 py-6 text-center">Chargement...</p>
+                        <p className="text-sm text-gray-400 px-4 py-6 text-center">{t("execution.testCases.loading")}</p>
                       ) : executionItems.length === 0 ? (
-                        <p className="text-sm text-gray-400 px-4 py-6 text-center">Aucun cas. Ajoute des suites puis lance Run Tests.</p>
+                        <p className="text-sm text-gray-400 px-4 py-6 text-center">{t("execution.testCases.empty")}</p>
                       ) : executionItems.map(item => {
                         const expanded = expandedItemId === item.id;
                         return (
@@ -530,37 +549,37 @@ export default function RunsPage() {
                               </button>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-semibold text-gray-800 truncate">{item.testCase?.title || "Test case"}</div>
-                                <div className="text-xs text-gray-400 truncate">{item.testCase?.description || "Pas de description"}</div>
+                                <div className="text-xs text-gray-400 truncate">{item.testCase?.description || t("execution.testCases.noDescription")}</div>
                               </div>
-                              <span className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${statusBadge[item.status]}`}>
-                                {statusIcon[item.status]}{item.status}
+                              <span className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${getStatusBadge(item.status, t)}`}>
+                                {getStatusIcon(item.status)}{t(`status.${item.status}`)}
                               </span>
                             </div>
 
                             {expanded && (
                               <div className="border-t border-blue-100 bg-white px-4 pb-4 pt-3 space-y-2">
                                 {!item.steps?.length ? (
-                                  <p className="text-xs text-gray-400">Aucun step généré.</p>
+                                  <p className="text-xs text-gray-400">{t("execution.testCases.noSteps")}</p>
                                 ) : item.steps.map(step => (
                                   <div key={step.id} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                                     <div className="flex items-start justify-between gap-3 mb-2">
                                       <div className="min-w-0">
-                                        <span className="text-xs font-bold text-gray-400">Step {step.testStep.stepOrder}</span>
+                                        <span className="text-xs font-bold text-gray-400">{t("execution.testCases.step")} {step.testStep.stepOrder}</span>
                                         <p className="text-sm text-gray-700 mt-0.5">{step.testStep.action}</p>
                                         {step.testStep.expected && (
-                                          <p className="text-xs text-gray-400 mt-1">Expected: {step.testStep.expected}</p>
+                                          <p className="text-xs text-gray-400 mt-1">{t("execution.testCases.expected")}: {step.testStep.expected}</p>
                                         )}
                                       </div>
-                                      <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${statusBadge[step.status]}`}>
-                                        {statusIcon[step.status]}{step.status}
+                                      <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${getStatusBadge(step.status, t)}`}>
+                                        {getStatusIcon(step.status)}{t(`status.${step.status}`)}
                                       </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {stepStatuses.map(s => (
                                         <button key={s} type="button" disabled={savingStepId === step.id}
                                           onClick={() => handleUpdateStep(step.id, s)}
-                                          className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50 transition-colors ${statusBtn[s]}`}>
-                                          {statusIcon[s]}{s}
+                                          className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50 transition-colors ${getStatusBtnClass(s)}`}>
+                                          {getStatusIcon(s)}{t(`status.${s}`)}
                                         </button>
                                       ))}
                                     </div>

@@ -1,21 +1,24 @@
 "use client";
 
 import { Eye, Edit, X } from "lucide-react";
-
-const statCards = [
-  { label: "Score qualité", value: "94.2%", accent: "#22c55e" },
-  { label: "Auth Module", value: "12 tests", accent: "#a855f7" },
-  { label: "Bugs ouverts", value: "23", accent: "#ef4444" },
-  { label: "Agent IA", value: "48 tests", accent: "#06b6d4" },
-];
+import { useTranslation } from "@/hooks/useTranslation";
 
 const modules = [
-  { name: "Auth API", success: "98%", failures: 2, lastRun: "Aujourd'hui" },
-  { name: "Payment", success: "72%", failures: 8, lastRun: "Hier" },
-  { name: "Dashboard", success: "96%", failures: 1, lastRun: "Aujourd'hui" },
+  { name: "Auth API",   success: "98%", failures: 2, lastRunKey: "today"     },
+  { name: "Payment",    success: "72%", failures: 8, lastRunKey: "yesterday"  },
+  { name: "Dashboard",  success: "96%", failures: 1, lastRunKey: "today"      },
 ];
 
 export default function DashboardPage() {
+  const { t } = useTranslation("dashboard");
+
+  const statCards = [
+    { label: t("stats.quality"),    value: "94.2%",   accent: "#22c55e" },
+    { label: t("stats.authModule"), value: "12 tests", accent: "#a855f7" },
+    { label: t("stats.openBugs"),   value: "23",       accent: "#ef4444" },
+    { label: t("stats.aiAgent"),    value: "48 tests", accent: "#06b6d4" },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Stat Cards */}
@@ -38,10 +41,10 @@ export default function DashboardPage() {
       {/* Module Auth Card */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          Module Auth — cliquez ici
+          {t("authCard.title")}
         </h3>
         <p className="text-sm text-gray-400">
-          Login, rôles, permissions, MFA, sessions et sécurité utilisateur.
+          {t("authCard.description")}
         </p>
       </div>
 
@@ -50,11 +53,11 @@ export default function DashboardPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left px-6 py-4 text-gray-500 font-medium">Module</th>
-              <th className="text-left px-6 py-4 text-gray-500 font-medium">Succès</th>
-              <th className="text-left px-6 py-4 text-gray-500 font-medium">Échecs</th>
-              <th className="text-left px-6 py-4 text-gray-500 font-medium">Dernière exécution</th>
-              <th className="text-left px-6 py-4 text-gray-500 font-medium">Actions</th>
+              <th className="text-left px-6 py-4 text-gray-500 font-medium">{t("table.module")}</th>
+              <th className="text-left px-6 py-4 text-gray-500 font-medium">{t("table.success")}</th>
+              <th className="text-left px-6 py-4 text-gray-500 font-medium">{t("table.failures")}</th>
+              <th className="text-left px-6 py-4 text-gray-500 font-medium">{t("table.lastRun")}</th>
+              <th className="text-left px-6 py-4 text-gray-500 font-medium">{t("table.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -66,7 +69,9 @@ export default function DashboardPage() {
                 <td className="px-6 py-4 font-medium text-gray-700">{mod.name}</td>
                 <td className="px-6 py-4 text-gray-600">{mod.success}</td>
                 <td className="px-6 py-4 text-gray-600">{mod.failures}</td>
-                <td className="px-6 py-4 text-gray-600">{mod.lastRun}</td>
+                <td className="px-6 py-4 text-gray-600">
+                  {t(`table.${mod.lastRunKey}`)}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <button className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-blue-500 hover:border-blue-200 transition-colors">

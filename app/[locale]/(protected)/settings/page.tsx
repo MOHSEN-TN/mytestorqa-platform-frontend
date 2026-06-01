@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, Globe, ChevronDown } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -102,7 +102,7 @@ function LanguageSelector({ currentLang, onLanguageChange, t }: { currentLang: s
 }
 
 export default function SettingsPage() {
-  const { t, locale, changeLanguage } = useTranslation('settings');
+  const { t, locale } = useTranslation('settings');
   
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");

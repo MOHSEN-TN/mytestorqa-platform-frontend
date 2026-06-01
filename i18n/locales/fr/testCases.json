@@ -1,0 +1,117 @@
+{
+  "title": "Gestion des tests",
+  "subtitle": "Projet → Suites → Cas de test",
+  "fullscreen": {
+    "enter": "Plein écran",
+    "exit": "Quitter",
+    "view": "Vue plein écran",
+    "close": "Fermer"
+  },
+  "projects": {
+    "title": "Projets",
+    "empty": "Aucun projet trouvé.",
+    "createdAt": "Créé le"
+  },
+  "suites": {
+    "title": "Suites de test",
+    "new": "Nouvelle suite",
+    "selectProjectFirst": "Choisis d'abord un projet.",
+    "loading": "Chargement...",
+    "empty": "Aucune suite trouvée.",
+    "noDescription": "Pas de description",
+    "choose": "Choisir",
+    "active": "Suite active",
+    "edit": "Modifier",
+    "duplicate": "Dupliquer",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer cette suite ?",
+    "createModal": {
+      "title": "Créer une suite de tests",
+      "name": "Nom de la suite",
+      "description": "Description",
+      "submit": "Créer"
+    },
+    "editModal": {
+      "title": "Modifier la suite",
+      "name": "Nom de la suite",
+      "description": "Description",
+      "submit": "Enregistrer"
+    }
+  },
+  "testCases": {
+    "title": "Cas de test",
+    "new": "Nouveau cas de test",
+    "search": "Recherche...",
+    "statusFilter": "Tous statuts",
+    "priorityFilter": "Toutes priorités",
+    "perPage": "{{count}} / page",
+    "selectSuiteFirst": "Choisis une suite pour afficher ses cas de test.",
+    "loading": "Chargement...",
+    "empty": "Aucun cas de test trouvé.",
+    "noDescription": "Pas de description",
+    "stepsCount": "{{count}} étapes",
+    "expand": "Voir",
+    "collapse": "Réduire",
+    "edit": "Modifier",
+    "duplicate": "Dupliquer",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer ce test case ?",
+    "descriptionLabel": "Description",
+    "expectedLabel": "Résultat attendu",
+    "stepsLabel": "Étapes de test",
+    "updatedAt": "Mis à jour",
+    "noSteps": "Aucune étape.",
+    "results": "{{count}} résultat(s)",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "page": "{{current}} / {{total}}",
+    "stepTable": {
+      "number": "#",
+      "action": "Action",
+      "expected": "Résultat attendu"
+    },
+    "status": {
+      "DRAFT": "Brouillon",
+      "READY": "Prêt",
+      "DEPRECATED": "Obsolète"
+    },
+    "priority": {
+      "LOW": "Basse",
+      "MEDIUM": "Moyenne",
+      "HIGH": "Haute",
+      "CRITICAL": "Critique"
+    }
+  },
+  "modals": {
+    "common": {
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "...",
+      "create": "Créer"
+    },
+    "createTestCase": {
+      "title": "Nouveau cas de test",
+      "titleLabel": "Titre",
+      "descriptionLabel": "Description",
+      "expectedLabel": "Résultat attendu global",
+      "statusLabel": "Statut",
+      "priorityLabel": "Priorité",
+      "stepsLabel": "Étapes de test",
+      "addStep": "Ajouter une étape",
+      "stepNumber": "Étape {{number}}",
+      "stepAction": "Action",
+      "stepExpected": "Résultat attendu"
+    },
+    "editTestCase": {
+      "title": "Modifier le cas de test",
+      "titleLabel": "Titre",
+      "descriptionLabel": "Description",
+      "expectedLabel": "Résultat attendu global",
+      "statusLabel": "Statut",
+      "priorityLabel": "Priorité"
+    }
+  },
+  "errors": {
+    "global": "Une erreur est survenue"
+  }
+}

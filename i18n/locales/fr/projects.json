@@ -1,50 +1,60 @@
 {
   "title": "Projets",
   "subtitle": "Liste des projets : chaque projet contient un nom et une description.",
-  "addProject": "Ajouter un projet",
-  "exportProjects": "Exporter",
-  "importProjects": "Importer",
-  "settings": "Paramètres",
-  "searchPlaceholder": "Rechercher un projet...",
+  "toolbar": {
+    "add": "Ajouter projet",
+    "export": "Exporter",
+    "import": "Importer",
+    "settings": "Paramètres",
+    "search": "Rechercher un projet..."
+  },
   "table": {
     "name": "Nom du projet",
     "description": "Description",
-    "status": "Statut",
+    "status": "Status",
     "actions": "Actions"
   },
   "status": {
-    "active": "Actif",
-    "inProgress": "En cours",
-    "planned": "Planifié",
-    "completed": "Terminé"
-  },
-  "modal": {
-    "createTitle": "Ajouter un nouveau projet",
-    "editTitle": "Modifier le projet",
-    "projectName": "Nom du projet",
-    "shortDescription": "Description courte",
-    "owner": "Responsable / Owner",
-    "projectStatus": "Statut du projet",
-    "qaOptions": "Options QA / IA"
+    "Actif": "Actif",
+    "En cours": "En cours",
+    "Planifié": "Planifié"
   },
   "pagination": {
-    "showing": "Affichage",
-    "of": "sur",
-    "projects": "projets",
-    "itemsPerPage": "Afficher :",
-    "perPage": "par page",
-    "showAll": "Tout afficher"
+    "show": "Afficher :",
+    "perPage5": "5 par page",
+    "perPage15": "15 par page",
+    "showAll": "Tout afficher",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "summary": "{{start}}–{{end}} sur {{total}} projets",
+    "empty": "0 projet"
   },
-  "messages": {
-    "noProjects": "Aucun projet trouvé.",
-    "noSearchResults": "Aucun projet trouvé pour « {{search}} ».",
-    "deleteConfirm": "Supprimer ce projet ?",
-    "duplicateConfirm": "Dupliquer ce projet ?",
-    "createSuccess": "Projet créé avec succès",
-    "updateSuccess": "Projet modifié avec succès",
-    "deleteSuccess": "Projet supprimé avec succès",
-    "duplicateSuccess": "Projet dupliqué avec succès",
-    "importConfirm": "Importer {{count}} nouveau(x) projet(s) ?",
-    "importDuplicateWarning": "⚠️ {{count}} projet(s) déjà existant(s) et ignoré(s)"
+  "empty": {
+    "search": "Aucun projet trouvé pour « {{search}} ».",
+    "default": "Aucun projet trouvé."
+  },
+  "loading": "Chargement...",
+  "deleteConfirm": "Supprimer ce projet ?",
+  "import": {
+    "invalid": "Fichier invalide ou mal formaté.",
+    "noValid": "Aucun projet valide trouvé dans le fichier.",
+    "duplicateWarning": "⚠️ {{count}} projet(s) déjà existant(s) et ignoré(s) :",
+    "confirmImport": "✅ {{count}} nouveau(x) projet(s) à importer. Continuer ?",
+    "nothingNew": "Aucun nouveau projet à importer."
+  },
+  "modal": {
+    "addTitle": "Ajouter un nouveau projet",
+    "editTitle": "Modifier le projet",
+    "name": "Nom du projet",
+    "description": "Description courte",
+    "owner": "Responsable / Owner",
+    "status": "Statut du projet",
+    "statusPlaceholder": "Actif, En cours, Planifié...",
+    "ai": "Options QA / IA",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "defaultError": "Impossible de créer le projet.",
+    "defaultEditError": "Impossible de modifier le projet."
   }
 }

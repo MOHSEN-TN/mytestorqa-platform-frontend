@@ -3,39 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const useTranslation = (_ns: string) => ({
-  t: (key: string) => {
-    const map: Record<string, string> = {
-      title: "SMART QA Platform",
-      subtitle: "Plateforme intelligente de gestion QA",
-      emailPlaceholder: "Email professionnel",
-      passwordPlaceholder: "Mot de passe",
-      loginButton: "Se connecter",
-      forgotPassword: "Mot de passe oublié ?",
-      forgotTitle: "Réinitialiser",
-      forgotSubtitle: "Entrez votre email pour recevoir un code de vérification.",
-      otpTitle: "Vérification",
-      otpSubtitle: "Entrez le code à 6 chiffres envoyé à",
-      sendCode: "Envoyer le code",
-      verifyCode: "Vérifier le code",
-      resendCode: "Renvoyer le code",
-      backToLogin: "Retour à la connexion",
-      backToEmail: "Changer l'email",
-      successTitle: "Mot de passe envoyé !",
-      successMsg: "Votre nouveau mot de passe a été envoyé à votre adresse email. Pensez à le changer après connexion.",
-      "errors.loginFailed": "Identifiants incorrects. Veuillez réessayer.",
-      "errors.emailRequired": "Veuillez entrer votre adresse email.",
-      "errors.otpRequired": "Veuillez entrer le code reçu par email.",
-      "errors.otpInvalid": "Code incorrect ou expiré.",
-      footer: `© ${new Date().getFullYear()} SMART QA · Tous droits réservés`,
-      feature1: "Authentification sécurisée",
-      feature2: "Gestion des tests et bugs",
-      feature3: "Rapports et Agent IA",
-    };
-    return map[key] ?? key;
-  },
-});
+import { useTranslation } from "@/hooks/useTranslation";
 
 const API = "http://localhost:3001";
 
@@ -71,8 +39,8 @@ export default function LoginPage() {
   // Cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
   }, [resendCooldown]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
@@ -100,7 +68,7 @@ export default function LoginPage() {
     }
   };
 
-  // ── Step 1 : Envoyer OTP ───────────────────────────────────────────────────
+  // ── Step 1 : Send OTP ───────────────────────────────────────────────────
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError("");
@@ -118,7 +86,7 @@ export default function LoginPage() {
       setResendCooldown(60);
       setView("forgot-otp");
     } catch {
-      // On affiche toujours succès pour sécurité
+      // Always show success for security
       setOtp(["", "", "", "", "", ""]);
       setResendCooldown(60);
       setView("forgot-otp");
@@ -127,7 +95,7 @@ export default function LoginPage() {
     }
   };
 
-  // ── Step 2 : Vérifier OTP ─────────────────────────────────────────────────
+  // ── Step 2 : Verify OTP ─────────────────────────────────────────────────
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setOtpError("");
@@ -186,6 +154,8 @@ export default function LoginPage() {
     setOtpError("");
     setResendCooldown(0);
   };
+
+  const currentYear = new Date().getFullYear();
 
   return (
     <>
@@ -288,7 +258,7 @@ export default function LoginPage() {
                   </button>
                 </form>
                 {error && <p className="mt-4 text-[12.5px] text-red-500 text-center bg-red-50 rounded-xl px-3 py-2.5">{error}</p>}
-                <p className="text-center text-[11px] text-slate-300 mt-8">{t("footer")}</p>
+                <p className="text-center text-[11px] text-slate-300 mt-8">{t("footer", { year: currentYear })}</p>
               </div>
             )}
 
@@ -342,7 +312,7 @@ export default function LoginPage() {
                     )}
                   </button>
                 </form>
-                <p className="text-center text-[11px] text-slate-300 mt-8">{t("footer")}</p>
+                <p className="text-center text-[11px] text-slate-300 mt-8">{t("footer", { year: currentYear })}</p>
               </div>
             )}
 
@@ -377,21 +347,21 @@ export default function LoginPage() {
                     <div className="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
                       <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                     </div>
-                    <span className="text-[11px] font-medium text-violet-500">Email</span>
+                    <span className="text-[11px] font-medium text-violet-500">{t("email")}</span>
                   </div>
                   <div className="flex-1 h-px bg-violet-200" />
                   <div className="flex items-center gap-1.5">
                     <div className="w-5 h-5 rounded-full bg-violet-600 border-2 border-violet-200 flex items-center justify-center">
                       <div className="w-2 h-2 rounded-full bg-white" />
                     </div>
-                    <span className="text-[11px] font-medium text-violet-600">Code OTP</span>
+                    <span className="text-[11px] font-medium text-violet-600">OTP</span>
                   </div>
                   <div className="flex-1 h-px bg-slate-200" />
                   <div className="flex items-center gap-1.5">
                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center">
                       <span className="text-[9px] text-slate-400 font-bold">3</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">Nouveau mdp</span>
+                    <span className="text-[11px] text-slate-400">{t("password")}</span>
                   </div>
                 </div>
 
@@ -440,7 +410,7 @@ export default function LoginPage() {
                 <div className="text-center mt-4">
                   {resendCooldown > 0 ? (
                     <p className="text-[12px] text-slate-400">
-                      Renvoyer dans <span className="text-violet-500 font-semibold">{resendCooldown}s</span>
+                      {t("resendCode")} dans <span className="text-violet-500 font-semibold">{resendCooldown}s</span>
                     </p>
                   ) : (
                     <button
@@ -453,7 +423,7 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                <p className="text-center text-[11px] text-slate-300 mt-6">{t("footer")}</p>
+                <p className="text-center text-[11px] text-slate-300 mt-6">{t("footer", { year: currentYear })}</p>
               </div>
             )}
 
@@ -472,7 +442,7 @@ export default function LoginPage() {
 
                 {/* Progress steps - all done */}
                 <div className="flex items-center gap-2 mb-8 w-full">
-                  {["Email", "Code OTP", "Nouveau mdp"].map((s, i) => (
+                  {[t("email"), "OTP", t("password")].map((s, i) => (
                     <div key={s} className="flex items-center gap-1.5 flex-1">
                       <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
                         <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
@@ -490,17 +460,17 @@ export default function LoginPage() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 12h14M12 5l7 7-7 7" />
                   </svg>
-                  Se connecter
+                  {t("login")}
                 </button>
 
-                <p className="text-center text-[11px] text-slate-300 mt-8">{t("footer")}</p>
+                <p className="text-center text-[11px] text-slate-300 mt-8">{t("footer", { year: currentYear })}</p>
               </div>
             )}
           </div>
 
           {/* ── RIGHT CARD ── */}
           <div className="hidden md:flex bg-white rounded-3xl shadow-[0_4px_32px_rgba(80,80,160,0.06)] p-9 flex-col justify-center">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[2px] mb-7">Fonctionnalités</p>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[2px] mb-7">{t("feature1")?.includes("Authentification") ? "Fonctionnalités" : "Features"}</p>
             {[
               { n: "01", label: t("feature1"), icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
               { n: "02", label: t("feature2"), icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },

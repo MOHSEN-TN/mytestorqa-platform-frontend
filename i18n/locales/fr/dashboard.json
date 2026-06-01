@@ -1,0 +1,21 @@
+{
+  "stats": {
+    "quality": "Score qualité",
+    "authModule": "Auth Module",
+    "openBugs": "Bugs ouverts",
+    "aiAgent": "Agent IA"
+  },
+  "authCard": {
+    "title": "Module Auth — cliquez ici",
+    "description": "Login, rôles, permissions, MFA, sessions et sécurité utilisateur."
+  },
+  "table": {
+    "module": "Module",
+    "success": "Succès",
+    "failures": "Échecs",
+    "lastRun": "Dernière exécution",
+    "actions": "Actions",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier"
+  }
+}
