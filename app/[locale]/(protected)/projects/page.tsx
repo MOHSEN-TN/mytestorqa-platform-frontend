@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -12,35 +13,12 @@ import {
   CheckCheck, AlertCircle, Search, Download, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { Modal } from "@/components/projects/Modal";
+import { StatusBadge } from "@/components/projects/StatusBadge";
+import { handleExport, handleImportFile } from "@/utils/functions";
 
-// ── Status badge ──────────────────────────────────────────────────────────────
-function StatusBadge({ status, t }: { status: string; t: any }) {
-  const map: Record<string, string> = {
-    Actif:     "bg-green-100 text-green-700",
-    "En cours":"bg-orange-100 text-orange-700",
-    Planifié:  "bg-gray-100 text-gray-600",
-  };
-  const cls = map[status] ?? "bg-gray-100 text-gray-500";
-  const label = t(`status.${status}`) ?? status;
-  return (
-    <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-medium ${cls}`}>
-      {label}
-    </span>
-  );
-}
-
-// ── Modal ─────────────────────────────────────────────────────────────────────
-function Modal({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">{children}</div>
-    </div>
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default function ProjectsPage() {
+  const cols = ["id", "name", "description", "status"] as const;
   const { t } = useTranslation("projects");
   const dispatch = useAppDispatch();
   const { projects, loading, creating, updating, deleting, error, selectedProject, pagination } =
@@ -116,70 +94,12 @@ export default function ProjectsPage() {
     if (deleteProject.fulfilled.match(res)) dispatch(fetchProjects());
   };
 
-  // ── Export / Import ───────────────────────────────────────────────────────
-  const handleExport = () => {
-    const cols = ["id", "name", "description", "status"] as const;
-    const csv = [cols.join(","), ...projects.map((p) =>
-      cols.map((c) => JSON.stringify(String((p as any)[c] ?? ""))).join(",")
-    )].join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    a.download = "projets.csv"; a.click();
-  };
-
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const parseCSV = (text: string) => {
-    const lines = text.trim().split(/\r?\n/);
-    const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim().toLowerCase());
-    return lines.slice(1).map((line) => {
-      const vals = line.match(/(".*?"|[^,]+)/g) ?? [];
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => (obj[h] = (vals[i] ?? "").replace(/"/g, "").trim()));
-      return obj;
-    }).filter((r) => r.name);
-  };
-
-  const handleImportFile = async (file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    const text = await file.text();
-    let data: Record<string, string>[];
-    try {
-      data = ext === "json" ? JSON.parse(text) : ext === "csv" ? parseCSV(text) : (() => { throw new Error(); })();
-    } catch { alert(t("import.invalid")); return; }
-
-    const validRows = data.filter((r) => r.name?.trim());
-    if (!validRows.length) { alert(t("import.noValid")); return; }
-
-    const existingNames = new Set(projects.map((p) => p.name.trim().toLowerCase()));
-    const duplicates: string[] = [];
-    const toImport: Record<string, string>[] = [];
-    for (const row of validRows) {
-      (existingNames.has(row.name.trim().toLowerCase()) ? duplicates : toImport).push(row as any);
-    }
-
-    let msg = "";
-    if (duplicates.length) {
-      msg += t("import.duplicateWarning", { count: duplicates.length }) +
-        "\n" + (duplicates as any[]).map((d: any) => `  • ${typeof d === "string" ? d : d.name}`).join("\n") + "\n\n";
-    }
-    if (!toImport.length) { alert(msg + t("import.nothingNew")); return; }
-    msg += t("import.confirmImport", { count: toImport.length });
-    if (!window.confirm(msg)) return;
-    for (const row of toImport) await dispatch(createProject({ name: row.name.trim() }));
-    dispatch(fetchProjects());
-  };
-
-  // ── Pagination display ────────────────────────────────────────────────────
   const currentLimit = limit === -1 ? pagination.total : limit;
   const startItem    = (page - 1) * currentLimit + 1;
   const endItem      = Math.min(page * currentLimit, pagination.total);
-
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">{t("title")}</h1>
         <p className="text-sm text-gray-500">{t("subtitle")}</p>
@@ -191,7 +111,7 @@ export default function ProjectsPage() {
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
           <Plus size={15} />{t("toolbar.add")}
         </button>
-        <button onClick={handleExport}
+        <button onClick={()=> handleExport(projects, "projets", cols)}
           className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-colors">
           <Download size={15} />{t("toolbar.export")}
         </button>
@@ -200,7 +120,7 @@ export default function ProjectsPage() {
           <Upload size={15} />{t("toolbar.import")}
         </button>
         <input ref={fileInputRef} type="file" accept=".csv,.json" className="hidden"
-          onChange={(e) => { if (e.target.files?.[0]) handleImportFile(e.target.files[0]); }} />
+          onChange={(e) => { if (e.target.files?.[0]) handleImportFile(e.target.files[0], projects, t, dispatch); }} />
         <button className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors">
           <Settings size={15} />{t("toolbar.settings")}
         </button>
