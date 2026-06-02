@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, User, Plus, Search, X } from "lucide-react";
+import { Settings, User, Plus, Search, X, User2 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import {
 
 const modules = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Vue d'ensemble de la plateforme" },
+  { href: "/users", label: "Users", icon: User2, description: "Gestion des utilisateur" },
   { href: "/auth", label: "Auth", icon: Lock, description: "Authentification et sécurité" },
   { href: "/projects", label: "Project", icon: FolderKanban, description: "Gestion des projets" },
   { href: "/test-cases", label: "Cas de test", icon: CheckSquare, description: "Gestion des cas de test" },
