@@ -1,7 +1,5 @@
-"use client";
-
-import { Settings, User, Plus, Search, X, User2 } from "lucide-react";
-import LogoutButton from "./LogoutButton";
+"use client";;
+import { Settings, Plus, Search, X, User2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
