@@ -14,6 +14,7 @@ import {
   BarChart2,
   Bot,
 } from "lucide-react";
+import UserAccountMenu from "./UserAccountMenu";
 
 const modules = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Vue d'ensemble de la plateforme" },
@@ -128,10 +129,7 @@ export default function Header() {
         <button className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-700 transition-colors">
           <Settings size={16} />
         </button>
-        <button className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-700 transition-colors">
-          <User size={16} />
-        </button>
-        <LogoutButton />
+        <UserAccountMenu />
       </div>
     </header>
   );
