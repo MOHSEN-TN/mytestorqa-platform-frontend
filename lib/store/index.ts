@@ -5,7 +5,8 @@ import testSuiteReducer from "../slices/testSuiteSlice";
 import campaignReducer from "../slices/campaignSlice";
 import iterationReducer from "../slices/iterationSlice";
 import usersReducer from '@/lib/slices/userSlice';
-
+import bugReducer from "@/lib/slices/bugSlice";
+import reportReducer from "@/lib/slices/reportSlice";
 export const store = configureStore({
   reducer: {
     projects: projectReducer,
@@ -14,6 +15,8 @@ export const store = configureStore({
     campaigns: campaignReducer,
     iterations: iterationReducer, 
     users: usersReducer,
+    bugs: bugReducer,
+    reports: reportReducer,
   },
 });
 

@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:3001/projects";
+const API_URL =
+  `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001"}/projects`;
 
 export type User = {
   id: string;
@@ -17,12 +18,51 @@ export type Member = {
 export type Project = {
   id: string;
   name: string;
+  description?: string | null;
   createdAt: string;
+  updatedAt?: string;
   members: Member[];
 };
 
+export type ProjectPayload = {
+  name: string;
+  description?: string;
+};
+
+async function parseResponse(response: Response) {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message: text,
+    };
+  }
+}
+
+function getErrorMessage(
+  data: unknown,
+  fallbackMessage: string,
+): string {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "message" in data &&
+    typeof (data as { message?: unknown }).message === "string"
+  ) {
+    return (data as { message: string }).message;
+  }
+
+  return fallbackMessage;
+}
+
 export async function getProjects(): Promise<Project[]> {
-  const res = await fetch(API_URL, {
+  const response = await fetch(API_URL, {
     method: "GET",
     credentials: "include",
     headers: {
@@ -30,63 +70,92 @@ export async function getProjects(): Promise<Project[]> {
     },
   });
 
-  if (!res.ok) {
-    throw new Error(`Erreur récupération projets (${res.status})`);
+  const data = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(
+        data,
+        `Erreur récupération projets (${response.status})`,
+      ),
+    );
   }
 
-  return res.json();
+  return data as Project[];
 }
 
-export async function createProject(name: string): Promise<Project> {
-  const res = await fetch(API_URL, {
+export async function createProject(
+  payload: ProjectPayload,
+): Promise<Project> {
+  const response = await fetch(API_URL, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({
+      name: payload.name.trim(),
+      description: payload.description?.trim() || null,
+    }),
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Erreur création projet: ${text}`);
+  const data = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(data, "Erreur lors de la création du projet"),
+    );
   }
 
-  return res.json();
+  return data as Project;
 }
 
-export async function updateProject(id: string, name: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/${id}`, {
+export async function updateProject(
+  id: string,
+  payload: ProjectPayload,
+): Promise<Project> {
+  const response = await fetch(`${API_URL}/${id}`, {
     method: "PATCH",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({
+      name: payload.name.trim(),
+      description: payload.description?.trim() || null,
+    }),
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Erreur modification projet: ${text}`);
+  const data = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(data, "Erreur lors de la modification du projet"),
+    );
   }
 
-  return res.json();
+  return data as Project;
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/${id}`, {
+  const response = await fetch(`${API_URL}/${id}`, {
     method: "DELETE",
     credentials: "include",
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Erreur suppression projet: ${text}`);
+  const data = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(data, "Erreur lors de la suppression du projet"),
+    );
   }
 }
 
-export async function duplicateProject(id: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/${id}/duplicate`, {
+export async function duplicateProject(
+  id: string,
+): Promise<Project> {
+  const response = await fetch(`${API_URL}/${id}/duplicate`, {
     method: "POST",
     credentials: "include",
     headers: {
@@ -94,10 +163,13 @@ export async function duplicateProject(id: string): Promise<Project> {
     },
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Erreur duplication projet: ${text}`);
+  const data = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(data, "Erreur lors de la duplication du projet"),
+    );
   }
 
-  return res.json();
+  return data as Project;
 }

@@ -1,219 +1,291 @@
-// lib/slices/userSlice.ts
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import {
-  getUsers,
-  createUser as createUserApi,
-  updateUser as updateUserApi,
-  deleteUser as deleteUserApi,
-  resetUserPassword as resetUserPasswordApi,
-  type User,
-  type CreateUserPayload,
-  type UpdateUserPayload,
-  type PaginatedUsers,
-  type FetchUsersParams,
-} from "@/lib/user-api";
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface UsersState {
-  users: User[];
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+
+export type UserRole = "ADMIN" | "QA_LEAD" | "TESTER";
+
+export type User = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  createdAt?: string;
+};
+
+type Pagination = {
+  page: number;
+  limit: number;
   total: number;
   totalPages: number;
+};
+
+type UsersState = {
+  users: User[];
   loading: boolean;
   creating: boolean;
   updating: boolean;
   deleting: boolean;
-  resetting: boolean;
+  resettingPassword: boolean;
   error: string | null;
   selectedUser: User | null;
-}
+  pagination: Pagination;
+};
 
 const initialState: UsersState = {
   users: [],
-  total: 0,
-  totalPages: 1,
   loading: false,
   creating: false,
   updating: false,
   deleting: false,
-  resetting: false,
+  resettingPassword: false,
   error: null,
   selectedUser: null,
+  pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
 };
 
-/* ── Thunks ── */
+type ApiError = { message?: string };
 
-export const fetchUsers = createAsyncThunk<
-  PaginatedUsers,
-  FetchUsersParams,
-  { rejectValue: string }
->("users/fetchUsers", async (params, thunkAPI) => {
+async function parseResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+
   try {
-    return await getUsers(params);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Erreur de chargement des utilisateurs"
-    );
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
   }
-});
+}
 
-export const createUser = createAsyncThunk<
-  User,
-  CreateUserPayload,
-  { rejectValue: string }
->("users/createUser", async (payload, thunkAPI) => {
-  try {
-    return await createUserApi(payload);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Impossible de créer l'utilisateur"
-    );
-  }
-});
+export const fetchUsers = createAsyncThunk(
+  "users/fetchUsers",
+  async (
+    params: { page?: number; limit?: number; search?: string } = {},
+    { rejectWithValue },
+  ) => {
+    try {
+      const query = new URLSearchParams();
+      if (params.page) query.set("page", String(params.page));
+      if (params.limit) query.set("limit", String(params.limit));
+      if (params.search) query.set("search", params.search);
 
-export const updateUser = createAsyncThunk<
-  User,
-  { userId: string; data: UpdateUserPayload },
-  { rejectValue: string }
->("users/updateUser", async (payload, thunkAPI) => {
-  try {
-    return await updateUserApi(payload.userId, payload.data);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Impossible de modifier l'utilisateur"
-    );
-  }
-});
+      const response = await fetch(`${API_URL}/users?${query.toString()}`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await parseResponse(response);
+      if (!response.ok) return rejectWithValue(data);
+      return data;
+    } catch (error: unknown) {
+      return rejectWithValue({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erreur lors du chargement des utilisateurs",
+      });
+    }
+  },
+);
 
-export const deleteUser = createAsyncThunk<
-  string,
-  string,
-  { rejectValue: string }
->("users/deleteUser", async (userId, thunkAPI) => {
-  try {
-    await deleteUserApi(userId);
-    return userId;
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Impossible de supprimer l'utilisateur"
-    );
-  }
-});
+export const createUser = createAsyncThunk(
+  "users/createUser",
+  async (
+    data: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: UserRole;
+      locale?: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await fetch(`${API_URL}/users`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const responseData = await parseResponse(response);
+      if (!response.ok) return rejectWithValue(responseData);
+      return responseData;
+    } catch (error: unknown) {
+      return rejectWithValue({
+        message:
+          error instanceof Error ? error.message : "Erreur lors de la création",
+      });
+    }
+  },
+);
 
-export const resetUserPassword = createAsyncThunk<
-  { message: string; temporaryPassword?: string },
-  string,
-  { rejectValue: string }
->("users/resetUserPassword", async (userId, thunkAPI) => {
-  try {
-    return await resetUserPasswordApi(userId);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(
-      error instanceof Error ? error.message : "Impossible de réinitialiser le mot de passe"
-    );
-  }
-});
+export const updateUser = createAsyncThunk(
+  "users/updateUser",
+  async (
+    payload: {
+      userId: string;
+      data: {
+        email?: string;
+        firstName?: string;
+        lastName?: string;
+        role?: UserRole;
+      };
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await fetch(`${API_URL}/users/${payload.userId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload.data),
+      });
+      const responseData = await parseResponse(response);
+      if (!response.ok) return rejectWithValue(responseData);
+      return responseData;
+    } catch (error: unknown) {
+      return rejectWithValue({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erreur lors de la mise à jour",
+      });
+    }
+  },
+);
 
-/* ── Slice ── */
+export const deleteUser = createAsyncThunk(
+  "users/deleteUser",
+  async (userId: string, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_URL}/users/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await parseResponse(response);
+      if (!response.ok) return rejectWithValue(data);
+      return { userId, ...data };
+    } catch (error: unknown) {
+      return rejectWithValue({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erreur lors de la suppression",
+      });
+    }
+  },
+);
+
+export const resetUserPassword = createAsyncThunk(
+  "users/resetUserPassword",
+  async (
+    payload: string | { userId: string; locale?: string },
+    { rejectWithValue },
+  ) => {
+    try {
+      const userId = typeof payload === "string" ? payload : payload.userId;
+      const locale = typeof payload === "string" ? undefined : payload.locale;
+
+      const response = await fetch(`${API_URL}/users/${userId}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      const data = await parseResponse(response);
+      if (!response.ok) return rejectWithValue(data);
+      return data as { message?: string };
+    } catch (error: unknown) {
+      return rejectWithValue({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erreur lors de l’envoi du lien de réinitialisation",
+      });
+    }
+  },
+);
 
 const userSlice = createSlice({
   name: "users",
   initialState,
   reducers: {
-    clearUserError(state) {
-      state.error = null;
-    },
-    clearUsers(state) {
-      state.users = [];
-      state.total = 0;
-      state.totalPages = 1;
-      state.loading = false;
-      state.error = null;
-    },
     setSelectedUser(state, action: PayloadAction<User | null>) {
       state.selectedUser = action.payload;
+    },
+    clearUsersError(state) {
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      /* fetch */
       .addCase(fetchUsers.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.loading = false;
-        state.users = action.payload.items;
-        state.total = action.payload.total;
-        state.totalPages = action.payload.totalPages;
+        state.users = action.payload?.data ?? [];
+        state.pagination = action.payload?.pagination ?? initialState.pagination;
       })
       .addCase(fetchUsers.rejected, (state, action) => {
+        const payload = action.payload as ApiError | undefined;
         state.loading = false;
-        state.error = action.payload ?? "Erreur de chargement";
+        state.error =
+          payload?.message ?? "Erreur lors du chargement des utilisateurs";
       })
-
-      /* create */
       .addCase(createUser.pending, (state) => {
         state.creating = true;
         state.error = null;
       })
-      .addCase(createUser.fulfilled, (state, action) => {
+      .addCase(createUser.fulfilled, (state) => {
         state.creating = false;
-        state.users.unshift(action.payload);
       })
       .addCase(createUser.rejected, (state, action) => {
+        const payload = action.payload as ApiError | undefined;
         state.creating = false;
-        state.error = action.payload ?? "Erreur de création";
+        state.error = payload?.message ?? "Erreur lors de la création";
       })
-
-      /* update */
       .addCase(updateUser.pending, (state) => {
         state.updating = true;
         state.error = null;
       })
-      .addCase(updateUser.fulfilled, (state, action) => {
+      .addCase(updateUser.fulfilled, (state) => {
         state.updating = false;
-        state.users = state.users.map((user) =>
-          user.id === action.payload.id ? action.payload : user
-        );
-        if (state.selectedUser?.id === action.payload.id) {
-          state.selectedUser = action.payload;
-        }
       })
       .addCase(updateUser.rejected, (state, action) => {
+        const payload = action.payload as ApiError | undefined;
         state.updating = false;
-        state.error = action.payload ?? "Erreur de modification";
+        state.error = payload?.message ?? "Erreur lors de la mise à jour";
       })
-
-      /* delete */
       .addCase(deleteUser.pending, (state) => {
         state.deleting = true;
         state.error = null;
       })
-      .addCase(deleteUser.fulfilled, (state, action) => {
+      .addCase(deleteUser.fulfilled, (state) => {
         state.deleting = false;
-        state.users = state.users.filter((user) => user.id !== action.payload);
-        if (state.selectedUser?.id === action.payload) {
-          state.selectedUser = null;
-        }
       })
       .addCase(deleteUser.rejected, (state, action) => {
+        const payload = action.payload as ApiError | undefined;
         state.deleting = false;
-        state.error = action.payload ?? "Erreur de suppression";
+        state.error = payload?.message ?? "Erreur lors de la suppression";
       })
-
-      /* reset password */
       .addCase(resetUserPassword.pending, (state) => {
-        state.resetting = true;
+        state.resettingPassword = true;
         state.error = null;
       })
       .addCase(resetUserPassword.fulfilled, (state) => {
-        state.resetting = false;
+        state.resettingPassword = false;
       })
       .addCase(resetUserPassword.rejected, (state, action) => {
-        state.resetting = false;
-        state.error = action.payload ?? "Erreur de réinitialisation";
+        const payload = action.payload as ApiError | undefined;
+        state.resettingPassword = false;
+        state.error =
+          payload?.message ??
+          "Erreur lors de l’envoi du lien de réinitialisation";
       });
   },
 });
 
-export const { clearUserError, clearUsers, setSelectedUser } = userSlice.actions;
+export const { setSelectedUser, clearUsersError } = userSlice.actions;
 export default userSlice.reducer;

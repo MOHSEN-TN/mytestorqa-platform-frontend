@@ -1,52 +1,151 @@
-import { createProject, fetchProjects } from "@/lib/slices/projectSlice";
+export type CsvRow = Record<string, string>;
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export  const handleExport = (data: any, dataName: string, cols: any) => {
-    const csv = [cols.join(","), ...data.map((p) =>
-      cols.map((c) => JSON.stringify(String((p as any)[c] ?? ""))).join(",")
-    )].join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    a.download = dataName+".csv"; a.click();
-  };
-export  const parseCSV = (text: string) => {
-    const lines = text.trim().split(/\r?\n/);
-    const headers = lines[0].split(",").map((h) => h.replace(/"/g, "").trim().toLowerCase());
-    return lines.slice(1).map((line) => {
-      const vals = line.match(/(".*?"|[^,]+)/g) ?? [];
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => (obj[h] = (vals[i] ?? "").replace(/"/g, "").trim()));
-      return obj;
-    }).filter((r) => r.name);
+export const handleExport = <T extends object>(
+  data: T[],
+  dataName: string,
+  cols: readonly (keyof T)[],
+): void => {
+  const escapeCsvValue = (value: unknown): string => {
+    const stringValue = String(value ?? "");
+
+    return `"${stringValue.replace(/"/g, '""')}"`;
   };
 
+  const csvRows = [
+    cols.map((column) => escapeCsvValue(String(column))).join(","),
+    ...data.map((row) =>
+      cols
+        .map((column) => escapeCsvValue(row[column]))
+        .join(","),
+    ),
+  ];
 
-export  const handleImportFile = async (file: File,data: any, t:any, dispatch: any) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    const text = await file.text();
-    let list: Record<string, string>[];
-    try {
-      list = ext === "json" ? JSON.parse(text) : ext === "csv" ? parseCSV(text) : (() => { throw new Error(); })();
-    } catch { alert(t("import.invalid")); return; }
+  const csv = `\uFEFF${csvRows.join("\n")}`;
 
-    const validRows = list.filter((r) => r.name?.trim());
-    if (!validRows.length) { alert(t("import.noValid")); return; }
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;",
+  });
 
-    const existingNames = new Set(data.map((p: any) => p.name.trim().toLowerCase()));
-    const duplicates: string[] = [];
-    const toImport: Record<string, string>[] = [];
-    for (const row of validRows) {
-      (existingNames.has(row.name.trim().toLowerCase()) ? duplicates : toImport).push(row as any);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = `${dataName}.csv`;
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+
+  URL.revokeObjectURL(url);
+};
+
+export const handleImportFile = (
+  file: File,
+): Promise<CsvRow[]> => {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error("Aucun fichier sélectionné."));
+      return;
     }
 
-    let msg = "";
-    if (duplicates.length) {
-      msg += t("import.duplicateWarning", { count: duplicates.length }) +
-        "\n" + (duplicates as any[]).map((d: any) => `  • ${typeof d === "string" ? d : d.name}`).join("\n") + "\n\n";
+    const isCsv =
+      file.type === "text/csv" ||
+      file.name.toLowerCase().endsWith(".csv");
+
+    if (!isCsv) {
+      reject(new Error("Le fichier doit être au format CSV."));
+      return;
     }
-    if (!toImport.length) { alert(msg + t("import.nothingNew")); return; }
-    msg += t("import.confirmImport", { count: toImport.length });
-    if (!window.confirm(msg)) return;
-    for (const row of toImport) await dispatch(createProject({ name: row.name.trim() }));
-    dispatch(fetchProjects());
-  };
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      try {
+        const content =
+          typeof reader.result === "string" ? reader.result : "";
+
+        const normalizedContent = content
+          .replace(/^\uFEFF/, "")
+          .trim();
+
+        if (!normalizedContent) {
+          resolve([]);
+          return;
+        }
+
+        const lines = normalizedContent
+          .split(/\r?\n/)
+          .filter((line) => line.trim().length > 0);
+
+        if (lines.length < 2) {
+          resolve([]);
+          return;
+        }
+
+        const parseCsvLine = (line: string): string[] => {
+          const values: string[] = [];
+          let currentValue = "";
+          let insideQuotes = false;
+
+          for (let index = 0; index < line.length; index += 1) {
+            const character = line[index];
+            const nextCharacter = line[index + 1];
+
+            if (
+              character === '"' &&
+              insideQuotes &&
+              nextCharacter === '"'
+            ) {
+              currentValue += '"';
+              index += 1;
+              continue;
+            }
+
+            if (character === '"') {
+              insideQuotes = !insideQuotes;
+              continue;
+            }
+
+            if (character === "," && !insideQuotes) {
+              values.push(currentValue.trim());
+              currentValue = "";
+              continue;
+            }
+
+            currentValue += character;
+          }
+
+          values.push(currentValue.trim());
+
+          return values;
+        };
+
+        const headers = parseCsvLine(lines[0]).map((header) =>
+          header.trim(),
+        );
+
+        const rows = lines.slice(1).map((line) => {
+          const values = parseCsvLine(line);
+
+          return headers.reduce<CsvRow>(
+            (row, header, index) => {
+              row[header] = values[index] ?? "";
+              return row;
+            },
+            {},
+          );
+        });
+
+        resolve(rows);
+      } catch {
+        reject(new Error("Impossible de lire le fichier CSV."));
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Erreur lors de la lecture du fichier."));
+    };
+
+    reader.readAsText(file, "utf-8");
+  });
+};
