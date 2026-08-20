@@ -1,0 +1,107 @@
+{
+  "title": "Exécution des tests",
+  "subtitle": "Projet → Campagne → Itération → Suites → Statut",
+  "fullscreen": {
+    "enter": "Plein écran",
+    "exit": "Quitter",
+    "view": "Vue plein écran",
+    "close": "Fermer"
+  },
+  "projects": {
+    "title": "Projets",
+    "empty": "Aucun projet.",
+    "loading": "Chargement...",
+    "selectFirst": "Choisis d'abord un projet.",
+    "createdAt": "Créé le"
+  },
+  "campaigns": {
+    "title": "Campagnes",
+    "subtitle": "Campagnes de test",
+    "empty": "Aucune campagne.",
+    "loading": "Chargement...",
+    "newPlaceholder": "Nouvelle campagne",
+    "selectFirst": "Choisis d'abord un projet."
+  },
+  "iterations": {
+    "title": "Itérations",
+    "subtitle": "Crée et sélectionne une itération",
+    "empty": "Aucune itération.",
+    "loading": "Chargement...",
+    "newPlaceholder": "Nouvelle itération",
+    "selectFirst": "Choisis d'abord une campagne."
+  },
+  "execution": {
+    "title": "Exécution",
+    "subtitle": "Sélectionne une itération",
+    "selectFirst": "Choisis une itération pour commencer.",
+    "iteration": "Itération",
+    "campaign": "Campagne",
+    "project": "Projet",
+    "suitesTitle": "Suites à exécuter",
+    "noSuites": "Aucune suite dans ce projet.",
+    "addSuites": "Ajouter les suites",
+    "runTests": "Lancer les tests",
+    "running": "Génération en cours...",
+    "progress": "Progression",
+    "done": "terminés",
+    "remaining": "restants",
+    "total": "Total",
+    "stats": {
+      "total": "Total",
+      "done": "Terminés",
+      "todo": "À faire",
+      "success": "Succès",
+      "failed": "Échecs",
+      "blocked": "Bloqués",
+      "skipped": "Ignorés"
+    },
+    "statistics": {
+      "title": "Statistiques",
+      "progress": "Progression",
+      "successRate": "Taux de succès",
+      "failureRate": "Taux d'échec",
+      "value": "Valeur",
+      "rate": "Taux"
+    },
+    "status": {
+      "title": "Statut d'exécution",
+      "TODO": "À faire",
+      "SUCCESS": "Succès",
+      "FAILED": "Échec",
+      "BLOCKED": "Bloqué",
+      "SKIPPED": "Ignoré"
+    },
+    "testCases": {
+      "title": "Cas de test",
+      "items": "élément(s)",
+      "loading": "Chargement...",
+      "empty": "Aucun cas. Ajoute des suites puis lance l'exécution.",
+      "noDescription": "Pas de description",
+      "noSteps": "Aucune étape générée.",
+      "step": "Étape",
+      "expected": "Résultat attendu"
+    },
+    "alerts": {
+      "suitesAdded": "Suites ajoutées. Tu peux maintenant lancer l'exécution.",
+      "runGenerated": "{{count}} cas générés.",
+      "loadError": "Impossible de charger les cas de test.",
+      "addSuitesError": "Impossible d'ajouter les suites.",
+      "runError": "Impossible de générer l'exécution.",
+      "stepUpdateError": "Impossible de mettre à jour le statut."
+    }
+  },
+  "buttons": {
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "add": "Ajouter"
+  },
+  "status": {
+    "TODO": "À faire",
+    "SUCCESS": "Succès",
+    "FAILED": "Échec",
+    "BLOCKED": "Bloqué",
+    "SKIPPED": "Ignoré"
+  }
+}

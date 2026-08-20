@@ -1,0 +1,27 @@
+{
+  "title": "Paramètres",
+  "subtitle": "Gérez vos préférences et la sécurité de votre compte.",
+  "password": {
+    "title": "Changer le mot de passe",
+    "description": "Mettez à jour votre mot de passe de façon sécurisée.",
+    "current": "Mot de passe actuel",
+    "new": "Nouveau mot de passe",
+    "confirm": "Confirmer le nouveau mot de passe",
+    "update": "Mettre à jour",
+    "updating": "Mise à jour...",
+    "success": "Mot de passe mis à jour avec succès",
+    "errors": {
+      "required": "Veuillez remplir tous les champs",
+      "mismatch": "Les mots de passe ne correspondent pas",
+      "invalid": "Mot de passe actuel incorrect",
+      "network": "Erreur réseau. Veuillez réessayer."
+    }
+  },
+  "language": {
+    "title": "Langue de l'application",
+    "description": "Choisissez votre langue préférée pour l'interface.",
+    "changing": "Changement de langue...",
+    "success": "Langue changée avec succès",
+    "error": "Erreur lors du changement de langue"
+  }
+}

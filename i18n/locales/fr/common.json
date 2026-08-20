@@ -1,0 +1,36 @@
+{
+  "app": {
+    "title": "TestorQA Platform",
+    "description": "Plateforme de test et d'assurance qualité"
+  },
+  "nav": {
+    "projects": "Projets",
+    "settings": "Paramètres",
+    "dashboard": "Tableau de bord",
+    "logout": "Déconnexion"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "add": "Ajouter",
+    "search": "Rechercher",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "success": "Opération réussie",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent"
+  },
+  "actions": {
+    "create": "Créer",
+    "update": "Mettre à jour",
+    "duplicate": "Dupliquer",
+    "export": "Exporter",
+    "import": "Importer",
+    "view": "Voir",
+    "select": "Sélectionner"
+  }
+}

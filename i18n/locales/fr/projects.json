@@ -1,0 +1,60 @@
+{
+  "title": "Projets",
+  "subtitle": "Liste des projets : chaque projet contient un nom et une description.",
+  "toolbar": {
+    "add": "Ajouter projet",
+    "export": "Exporter",
+    "import": "Importer",
+    "settings": "Paramètres",
+    "search": "Rechercher un projet..."
+  },
+  "table": {
+    "name": "Nom du projet",
+    "description": "Description",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "Actif": "Actif",
+    "En cours": "En cours",
+    "Planifié": "Planifié"
+  },
+  "pagination": {
+    "show": "Afficher :",
+    "perPage5": "5 par page",
+    "perPage15": "15 par page",
+    "showAll": "Tout afficher",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "summary": "{{start}}–{{end}} sur {{total}} projets",
+    "empty": "0 projet"
+  },
+  "empty": {
+    "search": "Aucun projet trouvé pour « {{search}} ».",
+    "default": "Aucun projet trouvé."
+  },
+  "loading": "Chargement...",
+  "deleteConfirm": "Supprimer ce projet ?",
+  "import": {
+    "invalid": "Fichier invalide ou mal formaté.",
+    "noValid": "Aucun projet valide trouvé dans le fichier.",
+    "duplicateWarning": "⚠️ {{count}} projet(s) déjà existant(s) et ignoré(s) :",
+    "confirmImport": "✅ {{count}} nouveau(x) projet(s) à importer. Continuer ?",
+    "nothingNew": "Aucun nouveau projet à importer."
+  },
+  "modal": {
+    "addTitle": "Ajouter un nouveau projet",
+    "editTitle": "Modifier le projet",
+    "name": "Nom du projet",
+    "description": "Description courte",
+    "owner": "Responsable / Owner",
+    "status": "Statut du projet",
+    "statusPlaceholder": "Actif, En cours, Planifié...",
+    "ai": "Options QA / IA",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "defaultError": "Impossible de créer le projet.",
+    "defaultEditError": "Impossible de modifier le projet."
+  }
+}

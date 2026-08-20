@@ -1,0 +1,60 @@
+{
+  "title": "Projects",
+  "subtitle": "Project list: each project contains a name and a description.",
+  "toolbar": {
+    "add": "Add project",
+    "export": "Export",
+    "import": "Import",
+    "settings": "Settings",
+    "search": "Search a project..."
+  },
+  "table": {
+    "name": "Project name",
+    "description": "Description",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "Actif": "Active",
+    "En cours": "In progress",
+    "Planifié": "Planned"
+  },
+  "pagination": {
+    "show": "Show:",
+    "perPage5": "5 per page",
+    "perPage15": "15 per page",
+    "showAll": "Show all",
+    "previous": "Previous",
+    "next": "Next",
+    "summary": "{{start}}–{{end}} of {{total}} projects",
+    "empty": "0 project"
+  },
+  "empty": {
+    "search": "No project found for « {{search}} ».",
+    "default": "No project found."
+  },
+  "loading": "Loading...",
+  "deleteConfirm": "Delete this project?",
+  "import": {
+    "invalid": "Invalid or malformed file.",
+    "noValid": "No valid project found in the file.",
+    "duplicateWarning": "⚠️ {{count}} project(s) already exist and will be skipped:",
+    "confirmImport": "✅ {{count}} new project(s) to import. Continue?",
+    "nothingNew": "No new project to import."
+  },
+  "modal": {
+    "addTitle": "Add a new project",
+    "editTitle": "Edit project",
+    "name": "Project name",
+    "description": "Short description",
+    "owner": "Owner",
+    "status": "Project status",
+    "statusPlaceholder": "Active, In progress, Planned...",
+    "ai": "QA / AI options",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "defaultError": "Unable to create the project.",
+    "defaultEditError": "Unable to update the project."
+  }
+}
