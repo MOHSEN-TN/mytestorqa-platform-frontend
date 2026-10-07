@@ -648,12 +648,17 @@ function ModalFooter({
 ══════════════════════════════════════════ */
 export default function TestCasesPage() {
   const { t } = useTranslation("testCases");
+  const { t: tProjects } = useTranslation("projects");
   const dispatch = useAppDispatch();
   const fullscreenRef = useRef<HTMLDivElement | null>(null);
 
-  const { projects, loading: loadingProjects, selectedProject, error: projectError } = useAppSelector(
-    (s) => s.projects
-  );
+  const {
+    projects,
+    loading: loadingProjects,
+    selectedProject,
+    error: projectError,
+    pagination: projectPagination,
+  } = useAppSelector((s) => s.projects);
   const {
     testSuites,
     selectedSuite,
@@ -683,6 +688,8 @@ export default function TestCasesPage() {
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectLimit, setProjectLimit] = useState(5);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [collapsedProjects, setCollapsedProjects] = useState(false);
@@ -748,10 +755,33 @@ export default function TestCasesPage() {
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
+  // Keep pagination display valid without synchronously updating React state
+  // when the total number of projects decreases.
+  const effectiveProjectPage = Math.min(
+    projectPage,
+    Math.max(projectPagination.totalPages, 1)
+  );
+
   /* ── effects ── */
   useEffect(() => {
-    dispatch(fetchProjects());
-  }, [dispatch]);
+    const page = Math.min(
+      projectPage,
+      Math.max(projectPagination.totalPages, 1)
+    );
+
+    dispatch(
+      fetchProjects({
+        page,
+        limit: projectLimit === -1 ? projectPagination.total : projectLimit,
+      })
+    );
+  }, [
+    dispatch,
+    projectPage,
+    projectLimit,
+    projectPagination.total,
+    projectPagination.totalPages,
+  ]);
 
   useEffect(() => {
     if (!selectedProject?.id) {
@@ -1459,6 +1489,105 @@ export default function TestCasesPage() {
                   );
                 })
               )}
+            </div>
+
+            <div className="border-t border-gray-100 px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-gray-500">{tProjects("pagination.show")}</span>
+
+                  <select
+                    value={projectLimit}
+                    onChange={(e) => {
+                      setProjectLimit(parseInt(e.target.value));
+                      setProjectPage(1);
+                    }}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value={5}>{tProjects("pagination.perPage5")}</option>
+                    <option value={15}>{tProjects("pagination.perPage15")}</option>
+                    <option value={-1}>{tProjects("pagination.showAll")}</option>
+                  </select>
+
+                  <p className="text-sm text-gray-500">
+                    {projectPagination.total > 0
+                      ? tProjects("pagination.summary", {
+                          start:
+                            (effectiveProjectPage - 1) *
+                              (projectLimit === -1 ? projectPagination.total : projectLimit) +
+                            1,
+                          end: Math.min(
+                            effectiveProjectPage *
+                              (projectLimit === -1 ? projectPagination.total : projectLimit),
+                            projectPagination.total
+                          ),
+                          total: projectPagination.total,
+                        })
+                      : tProjects("pagination.empty")}
+                  </p>
+                </div>
+
+                {projectLimit !== -1 && projectPagination.totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setProjectPage((p) => Math.max(1, p - 1))}
+                      disabled={effectiveProjectPage === 1 || loadingProjects}
+                      className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft size={15} />
+                      {tProjects("pagination.previous")}
+                    </button>
+
+                    {Array.from({ length: projectPagination.totalPages }, (_, i) => i + 1)
+                      .filter(
+                        (p) =>
+                          p === 1 ||
+                          p === projectPagination.totalPages ||
+                          Math.abs(p - effectiveProjectPage) <= 1
+                      )
+                      .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) {
+                          acc.push("...");
+                        }
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((p, idx) =>
+                        p === "..." ? (
+                          <span key={`project-ellipsis-${idx}`} className="px-2 text-gray-400">
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setProjectPage(p as number)}
+                            className={`h-8 w-8 rounded-lg border text-sm transition-colors ${
+                              effectiveProjectPage === p
+                                ? "border-blue-600 bg-blue-600 font-medium text-white"
+                                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProjectPage((p) => Math.min(projectPagination.totalPages, p + 1))
+                      }
+                      disabled={effectiveProjectPage === projectPagination.totalPages || loadingProjects}
+                      className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {tProjects("pagination.next")}
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
 

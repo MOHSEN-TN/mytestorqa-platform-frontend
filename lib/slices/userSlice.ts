@@ -3,7 +3,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 const API_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
-export type UserRole = "ADMIN" | "QA_LEAD" | "TESTER";
+export type UserRole = "ADMIN" | "QA_LEAD" | "TESTER" | "VIEWER";
 
 export type User = {
   id: string;
@@ -12,6 +12,11 @@ export type User = {
   lastName: string;
   role: UserRole;
   createdAt?: string;
+  memberships?: Array<{
+    projectId: string;
+    role: string;
+    project?: { id: string; name: string };
+  }>;
 };
 
 type Pagination = {
@@ -96,6 +101,7 @@ export const createUser = createAsyncThunk(
       firstName: string;
       lastName: string;
       role: UserRole;
+      projectId?: string;
       locale?: string;
     },
     { rejectWithValue },
@@ -129,6 +135,7 @@ export const updateUser = createAsyncThunk(
         firstName?: string;
         lastName?: string;
         role?: UserRole;
+        projectId?: string;
       };
     },
     { rejectWithValue },

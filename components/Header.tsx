@@ -6,7 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import UserAccountMenu from "./UserAccountMenu";
 import {
   LayoutDashboard,
-  Lock,
   FolderKanban,
   CheckSquare,
   Play,
@@ -23,6 +22,8 @@ type ModuleItem = {
   adminOnly?: boolean;
 };
 
+const VIEWER_ALLOWED_MODULES = new Set(["/dashboard", "/projects", "/reports"]);
+
 const modules: ModuleItem[] = [
   {
     href: "/dashboard",
@@ -30,7 +31,7 @@ const modules: ModuleItem[] = [
     icon: LayoutDashboard,
     description: "Vue d'ensemble de la plateforme",
   },
- 
+
   {
     href: "/users",
     label: "Users",
@@ -106,6 +107,14 @@ export default function Header() {
   }, []);
 
   const allowedModules = modules.filter((module) => {
+    if (!currentRole) {
+      return false;
+    }
+
+    if (currentRole === "VIEWER") {
+      return VIEWER_ALLOWED_MODULES.has(module.href);
+    }
+
     if (module.adminOnly && currentRole !== "ADMIN") {
       return false;
     }
@@ -141,7 +150,7 @@ export default function Header() {
 
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 gap-4">
-      <h1 className="text-xl font-bold text-gray-800 shrink-0">Dashboard</h1>
+
 
       <div ref={ref} className="relative flex-1 max-w-md">
         <div className="relative">
@@ -211,7 +220,7 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-       
+
 
         <button
           type="button"

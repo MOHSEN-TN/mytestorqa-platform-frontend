@@ -62,10 +62,17 @@ type ReportOptions = {
   }[];
 };
 
+type ReportPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
 type ReportState = {
   reports: Report[];
   selectedReport: Report | null;
-  preview: any | null;
+  preview: ReportPreview | null;
   stats: ReportStats;
   options: ReportOptions;
   loading: boolean;
@@ -73,12 +80,174 @@ type ReportState = {
   deleting: boolean;
   previewLoading: boolean;
   error: string | null;
-  pagination: {
-    page: number;
-    limit: number;
+  pagination: ReportPagination;
+};
+
+type ApiError = {
+  message?: string;
+  [key: string]: unknown;
+};
+
+type FetchReportsParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  format?: string;
+  status?: string;
+  projectId?: string;
+};
+
+type ReportsResponse = {
+  data?: Report[];
+  pagination?: ReportPagination;
+};
+
+type ReportSummary = {
+  total?: number;
+  success?: number;
+  failed?: number;
+  blocked?: number;
+  skipped?: number;
+  successRate?: number;
+  open?: number;
+  resolved?: number;
+  critical?: number;
+  resolutionRate?: number;
+};
+
+type ReportPreviewTest = {
+  id: string;
+  testId?: string;
+  title?: string;
+  suite?: string;
+  mode?: string;
+  status?: string;
+  duration?: number | null;
+  browser?: string | null;
+  error?: string | null;
+  executedAt?: string | null;
+};
+
+type ReportPreviewBug = {
+  id: string;
+  title: string;
+  status: string;
+  severity: string;
+  priority?: string | null;
+  createdAt?: string | null;
+};
+
+type ReportDistribution = {
+  label: string;
+  count: number;
+};
+
+type ReportPreviewStats = {
+  summary?: ReportSummary;
+  testInventory?: {
     total: number;
-    totalPages: number;
+    manual: number;
+    automated: number;
   };
+  executionsByMode?: {
+    manual: number;
+    automated: number;
+  };
+  trend?: Array<{
+    date: string;
+    executed?: number;
+    created?: number;
+  }>;
+  failedTests?: ReportPreviewTest[];
+  performance?: {
+    averageDurationMs: number;
+    maxDurationMs: number;
+  };
+  quality?: {
+    qualityScore: number | null;
+    performance: number | null;
+    accessibility: number | null;
+    bestPractices: number | null;
+    seo: number | null;
+  };
+  qaHealth?: {
+    successRate: number;
+    bugResolutionRate: number;
+    automationRate: number;
+  };
+  operational?: {
+    totalTests: number;
+    totalExecutions: number;
+    openBugs: number;
+    criticalBugs: number;
+  };
+  audit?: {
+    requestedUrl: string | null;
+    finalUrl: string | null;
+    lighthouseVersion: string | null;
+    auditedAt: string | null;
+    auditsCount: number;
+  };
+  byStatus?: ReportDistribution[];
+  bySeverity?: ReportDistribution[];
+  byPriority?: ReportDistribution[];
+  criticalBugs?: ReportPreviewBug[];
+  qualityScore?: number | null;
+  totalExecutions?: number;
+  success?: number;
+  failed?: number;
+  blocked?: number;
+  skipped?: number;
+  manualTests?: number;
+  automatedTests?: number;
+  manualExecutions?: number;
+  automatedExecutions?: number;
+  averageDurationMs?: number;
+  accessibility?: number | null;
+  bestPractices?: number | null;
+  seo?: number | null;
+  successRate?: number;
+  bugResolutionRate?: number;
+  automationRate?: number;
+  totalTests?: number;
+  openBugs?: number;
+  criticalBugsCount?: number;
+  totalBugs?: number;
+  resolvedBugs?: number;
+};
+
+type ReportPreview = {
+  report?: Report | null;
+  stats?: ReportPreviewStats;
+  summary?: string;
+};
+
+type ReportPreviewResponse = {
+  data?: ReportPreview;
+};
+
+type CreateReportPayload = {
+  name: string;
+  type: ReportType;
+  format: ReportFormat;
+  period?: string;
+  projectId?: string;
+  includeCharts?: boolean;
+  includeDetails?: boolean;
+  includeLogs?: boolean;
+};
+
+type CreateReportResponse = {
+  data?: Report & {
+    generatedStats?: ReportPreviewStats;
+  };
+  message?: string;
+};
+
+type DeleteReportResponse = {
+  id: string;
+  [key: string]: unknown;
 };
 
 const initialState: ReportState = {
@@ -113,28 +282,41 @@ const initialState: ReportState = {
   },
 };
 
-async function parseResponse(res: Response) {
+async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
 
   try {
-    return text ? JSON.parse(text) : {};
+    return (text ? JSON.parse(text) : {}) as T;
   } catch {
-    return { message: text };
+    return { message: text } as T;
   }
 }
 
-export const fetchReports = createAsyncThunk(
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+export const fetchReports = createAsyncThunk<
+  ReportsResponse,
+  FetchReportsParams | undefined,
+  { rejectValue: ApiError }
+>(
   "reports/fetchReports",
   async (
-    params: {
-      page?: number;
-      limit?: number;
-      search?: string;
-      type?: string;
-      format?: string;
-      status?: string;
-      projectId?: string;
-    } = {},
+    params: FetchReportsParams = {},
     { rejectWithValue },
   ) => {
     try {
@@ -153,20 +335,27 @@ export const fetchReports = createAsyncThunk(
         credentials: "include",
       });
 
-      const data = await parseResponse(res);
+      const data = await parseResponse<ReportsResponse & ApiError>(res);
 
       if (!res.ok) return rejectWithValue(data);
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue({
-        message: error?.message || "Erreur lors du chargement des rapports",
+        message: getErrorMessage(
+          error,
+          "Erreur lors du chargement des rapports",
+        ),
       });
     }
   },
 );
 
-export const fetchReportStats = createAsyncThunk(
+export const fetchReportStats = createAsyncThunk<
+  Partial<ReportStats>,
+  void,
+  { rejectValue: ApiError }
+>(
   "reports/fetchReportStats",
   async (_, { rejectWithValue }) => {
     try {
@@ -174,20 +363,27 @@ export const fetchReportStats = createAsyncThunk(
         credentials: "include",
       });
 
-      const data = await parseResponse(res);
+      const data = await parseResponse<Partial<ReportStats> & ApiError>(res);
 
       if (!res.ok) return rejectWithValue(data);
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue({
-        message: error?.message || "Erreur lors du chargement des statistiques",
+        message: getErrorMessage(
+          error,
+          "Erreur lors du chargement des statistiques",
+        ),
       });
     }
   },
 );
 
-export const fetchReportOptions = createAsyncThunk(
+export const fetchReportOptions = createAsyncThunk<
+  ReportOptions,
+  void,
+  { rejectValue: ApiError }
+>(
   "reports/fetchReportOptions",
   async (_, { rejectWithValue }) => {
     try {
@@ -195,34 +391,29 @@ export const fetchReportOptions = createAsyncThunk(
         credentials: "include",
       });
 
-      const data = await parseResponse(res);
+      const data = await parseResponse<ReportOptions & ApiError>(res);
 
       if (!res.ok) return rejectWithValue(data);
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue({
-        message: error?.message || "Erreur lors du chargement des options",
+        message: getErrorMessage(
+          error,
+          "Erreur lors du chargement des options",
+        ),
       });
     }
   },
 );
 
-export const createReport = createAsyncThunk(
+export const createReport = createAsyncThunk<
+  CreateReportResponse,
+  CreateReportPayload,
+  { rejectValue: ApiError }
+>(
   "reports/createReport",
-  async (
-    payload: {
-      name: string;
-      type: ReportType;
-      format: ReportFormat;
-      period?: string;
-      projectId?: string;
-      includeCharts?: boolean;
-      includeDetails?: boolean;
-      includeLogs?: boolean;
-    },
-    { rejectWithValue },
-  ) => {
+  async (payload, { rejectWithValue }) => {
     try {
       const res = await fetch(`${API_URL}/reports`, {
         method: "POST",
@@ -233,20 +424,27 @@ export const createReport = createAsyncThunk(
         body: JSON.stringify(payload),
       });
 
-      const data = await parseResponse(res);
+      const data = await parseResponse<CreateReportResponse & ApiError>(res);
 
       if (!res.ok) return rejectWithValue(data);
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue({
-        message: error?.message || "Erreur lors de la génération du rapport",
+        message: getErrorMessage(
+          error,
+          "Erreur lors de la génération du rapport",
+        ),
       });
     }
   },
 );
 
-export const fetchReportPreview = createAsyncThunk(
+export const fetchReportPreview = createAsyncThunk<
+  ReportPreviewResponse,
+  string,
+  { rejectValue: ApiError }
+>(
   "reports/fetchReportPreview",
   async (id: string, { rejectWithValue }) => {
     try {
@@ -254,20 +452,27 @@ export const fetchReportPreview = createAsyncThunk(
         credentials: "include",
       });
 
-      const data = await parseResponse(res);
+      const data = await parseResponse<ReportPreviewResponse & ApiError>(res);
 
       if (!res.ok) return rejectWithValue(data);
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue({
-        message: error?.message || "Erreur lors du chargement de l’aperçu",
+        message: getErrorMessage(
+          error,
+          "Erreur lors du chargement de l’aperçu",
+        ),
       });
     }
   },
 );
 
-export const deleteReport = createAsyncThunk(
+export const deleteReport = createAsyncThunk<
+  DeleteReportResponse,
+  string,
+  { rejectValue: ApiError }
+>(
   "reports/deleteReport",
   async (id: string, { rejectWithValue }) => {
     try {
@@ -276,14 +481,17 @@ export const deleteReport = createAsyncThunk(
         credentials: "include",
       });
 
-      const data = await parseResponse(res);
+      const data = await parseResponse<Record<string, unknown> & ApiError>(res);
 
       if (!res.ok) return rejectWithValue(data);
 
       return { id, ...data };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue({
-        message: error?.message || "Erreur lors de la suppression du rapport",
+        message: getErrorMessage(
+          error,
+          "Erreur lors de la suppression du rapport",
+        ),
       });
     }
   },
@@ -309,26 +517,29 @@ const reportSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchReports.fulfilled, (state, action: any) => {
+      .addCase(fetchReports.fulfilled, (state, action) => {
         state.loading = false;
-        state.reports = action.payload?.data || [];
-        state.pagination = action.payload?.pagination || initialState.pagination;
+        state.reports = action.payload.data || [];
+        state.pagination = action.payload.pagination || initialState.pagination;
 
         if (!state.selectedReport && state.reports.length > 0) {
           state.selectedReport = state.reports[0];
         }
       })
-      .addCase(fetchReports.rejected, (state, action: any) => {
+      .addCase(fetchReports.rejected, (state, action) => {
         state.loading = false;
         state.error =
           action.payload?.message || "Erreur chargement des rapports";
       })
 
-      .addCase(fetchReportStats.fulfilled, (state, action: any) => {
-        state.stats = action.payload || initialState.stats;
+      .addCase(fetchReportStats.fulfilled, (state, action) => {
+        state.stats = {
+          ...initialState.stats,
+          ...action.payload,
+        };
       })
 
-      .addCase(fetchReportOptions.fulfilled, (state, action: any) => {
+      .addCase(fetchReportOptions.fulfilled, (state, action) => {
         state.options = action.payload || initialState.options;
       })
 
@@ -339,7 +550,7 @@ const reportSlice = createSlice({
       .addCase(createReport.fulfilled, (state) => {
         state.creating = false;
       })
-      .addCase(createReport.rejected, (state, action: any) => {
+      .addCase(createReport.rejected, (state, action) => {
         state.creating = false;
         state.error =
           action.payload?.message || "Erreur génération du rapport";
@@ -349,11 +560,11 @@ const reportSlice = createSlice({
         state.previewLoading = true;
         state.error = null;
       })
-      .addCase(fetchReportPreview.fulfilled, (state, action: any) => {
+      .addCase(fetchReportPreview.fulfilled, (state, action) => {
         state.previewLoading = false;
-        state.preview = action.payload?.data || null;
+        state.preview = action.payload.data || null;
       })
-      .addCase(fetchReportPreview.rejected, (state, action: any) => {
+      .addCase(fetchReportPreview.rejected, (state, action) => {
         state.previewLoading = false;
         state.error =
           action.payload?.message || "Erreur chargement aperçu rapport";
@@ -363,17 +574,17 @@ const reportSlice = createSlice({
         state.deleting = true;
         state.error = null;
       })
-      .addCase(deleteReport.fulfilled, (state, action: any) => {
+      .addCase(deleteReport.fulfilled, (state, action) => {
         state.deleting = false;
         state.reports = state.reports.filter(
-          (report) => report.id !== action.payload?.id,
+          (report) => report.id !== action.payload.id,
         );
 
-        if (state.selectedReport?.id === action.payload?.id) {
+        if (state.selectedReport?.id === action.payload.id) {
           state.selectedReport = state.reports[0] || null;
         }
       })
-      .addCase(deleteReport.rejected, (state, action: any) => {
+      .addCase(deleteReport.rejected, (state, action) => {
         state.deleting = false;
         state.error =
           action.payload?.message || "Erreur suppression du rapport";

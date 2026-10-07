@@ -49,8 +49,8 @@ export default function LoginPage() {
 
       router.replace(`/${locale}/dashboard`);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || "Erreur login");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur login");
     } finally {
       setLoading(false);
     }

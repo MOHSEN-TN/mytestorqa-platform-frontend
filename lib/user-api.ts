@@ -6,8 +6,13 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'ADMIN' | 'QA_LEAD' | 'TESTER';
+  role: 'ADMIN' | 'QA_LEAD' | 'TESTER' | 'VIEWER';
   createdAt: string;
+  memberships?: Array<{
+    projectId: string;
+    role: string;
+    project?: { id: string; name: string };
+  }>;
 }
 
 export interface CreateUserPayload {
@@ -15,13 +20,15 @@ export interface CreateUserPayload {
   firstName: string;
   lastName: string;
   role: string;
+  projectId?: string;
 }
 
 export interface UpdateUserPayload {
   email?: string;
   firstName?: string;
   lastName?: string;
-  role?: 'ADMIN' | 'QA_LEAD' | 'TESTER';
+  role?: 'ADMIN' | 'QA_LEAD' | 'TESTER' | 'VIEWER';
+  projectId?: string;
 }
 
 export interface PaginatedUsers {
@@ -53,9 +60,9 @@ export async function getUsers(params: FetchUsersParams = {}): Promise<Paginated
   if (params.search) searchParams.append('search', params.search);
   if (params.page) searchParams.append('page', String(params.page));
   if (params.limit) searchParams.append('limit', String(params.limit));
-  
+
   const url = `${API_URL}/users${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-  
+
   const res = await fetch(url, {
     method: "GET",
     credentials: "include",
@@ -68,7 +75,7 @@ export async function getUsers(params: FetchUsersParams = {}): Promise<Paginated
   }
 
   const backendData: BackendPaginatedUsers = await res.json();
-  
+
   // Transform backend response to match expected PaginatedUsers structure
   return {
     items: backendData.data,

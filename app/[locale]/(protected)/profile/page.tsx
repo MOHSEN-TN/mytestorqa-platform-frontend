@@ -46,6 +46,8 @@ export default function ProfilePage() {
         return "Responsable QA";
       case "TESTER":
         return "Testeur";
+      case "VIEWER":
+        return "Stakeholder / Viewer";
       default:
         return role || "-";
     }

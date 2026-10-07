@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Bot,
   Loader2,
+  Maximize2,
   MessageSquarePlus,
+  Minimize2,
   Plus,
   Send,
   Trash2,
@@ -12,6 +14,8 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { setSelectedProject } from "@/lib/slices/projectSlice";
 
 type ProjectOption = {
   id: string;
@@ -33,6 +37,10 @@ type ChatMessage = {
   content: string;
   createdAt?: string;
   pending?: boolean;
+  metadata?: {
+    provider?: ChatProvider;
+    model?: string;
+  } | null;
 };
 
 type ChatSession = {
@@ -139,12 +147,33 @@ function formatTime(value?: string) {
   }).format(date);
 }
 
+function getMessageProviderLabel(message: ChatMessage) {
+  const messageProvider = message.metadata?.provider;
+
+  if (messageProvider === "CLOUD_AI") return "Gemini";
+  if (messageProvider === "OLLAMA_LOCAL") return "Ollama";
+
+  const model = message.metadata?.model?.trim().toLowerCase();
+  if (model?.replace(/^models\//, "").startsWith("gemini-")) {
+    return "Gemini";
+  }
+  if (model) return "Ollama";
+
+  return null;
+}
+
 export default function SmartQaChat({
   apiBaseUrl,
   projects,
   explorations,
 }: SmartQaChatProps) {
+  const dispatch = useAppDispatch();
+  const selectedProject = useAppSelector(
+    (state) => state.projects.selectedProject,
+  );
+
   const [open, setOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [status, setStatus] = useState<SmartQaStatus | null>(null);
   const [provider, setProvider] = useState<ChatProvider>("CLOUD_AI");
   const [statusLoading, setStatusLoading] = useState(true);
@@ -277,6 +306,31 @@ export default function SmartQaChat({
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
+  /*
+   * Synchronisation volontaire entre l'état global Redux et le contexte local
+   * de SMART-QA.
+   *
+   * Cette synchronisation est nécessaire lorsque le projet est sélectionné
+   * depuis l'extérieur du composant. Elle réinitialise également le contexte
+   * de conversation afin d'éviter de conserver une exploration, une session
+   * ou des messages appartenant à un autre projet.
+   *
+   * La règle react-hooks/set-state-in-effect est donc désactivée uniquement
+   * pour cet effet afin de préserver le comportement métier existant.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+
+    setProjectId(selectedProject.id);
+    setExplorationId("");
+    setSessionId("");
+    setMessages([WELCOME_MESSAGE]);
+    setInput("");
+    setError(null);
+  }, [selectedProject?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   function startNewConversation() {
     setSessionId("");
     setMessages([WELCOME_MESSAGE]);
@@ -285,13 +339,24 @@ export default function SmartQaChat({
   }
 
   function handleProviderChange(value: ChatProvider) {
+    if (value === provider) return;
+
+    // Hot switch: keep the current conversation and its history.
+    // The next message is sent with the newly selected provider.
     setProvider(value);
-    startNewConversation();
+    setError(null);
+    void loadStatus(true);
   }
 
   function handleProjectChange(value: string) {
     setProjectId(value);
     setExplorationId("");
+
+    if (value) {
+      const project = projects.find((item) => item.id === value);
+      if (project) dispatch(setSelectedProject(project));
+    }
+
     startNewConversation();
   }
 
@@ -299,7 +364,11 @@ export default function SmartQaChat({
     setExplorationId(value);
 
     const exploration = explorations.find((item) => item.id === value);
-    if (exploration) setProjectId(exploration.projectId);
+    if (exploration) {
+      setProjectId(exploration.projectId);
+      const project = projects.find((item) => item.id === exploration.projectId);
+      if (project) dispatch(setSelectedProject(project));
+    }
 
     startNewConversation();
   }
@@ -314,8 +383,9 @@ export default function SmartQaChat({
     }
 
     const session = sessions.find((item) => item.id === value);
-    if (session?.projectId) setProjectId(session.projectId);
-    if (session?.explorationId) setExplorationId(session.explorationId);
+    setProjectId(session?.projectId || "");
+    setExplorationId(session?.explorationId || "");
+
     if (session?.model) {
       const normalizedModel = session.model
         .trim()
@@ -327,6 +397,7 @@ export default function SmartQaChat({
           ? "CLOUD_AI"
           : "OLLAMA_LOCAL"
       );
+      void loadStatus(false);
     }
 
     try {
@@ -427,7 +498,7 @@ export default function SmartQaChat({
           sessionId: sessionId || undefined,
           projectId: sessionId ? undefined : projectId || undefined,
           explorationId: sessionId ? undefined : explorationId || undefined,
-          provider: sessionId ? undefined : provider,
+          provider,
         }),
       });
       const data = await readResponse(response);
@@ -474,7 +545,10 @@ export default function SmartQaChat({
     <>
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) setIsExpanded(false);
+          setOpen((value) => !value);
+        }}
         aria-label={open ? "Fermer SMART-QA" : "Ouvrir SMART-QA"}
         className="fixed bottom-6 right-6 z-50 flex h-14 items-center gap-2 rounded-full bg-purple-700 px-5 font-bold text-white shadow-xl transition hover:bg-purple-800"
       >
@@ -483,7 +557,13 @@ export default function SmartQaChat({
       </button>
 
       {open && (
-        <section className="fixed inset-x-3 bottom-24 z-50 flex max-h-[78vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[430px]">
+        <section
+          className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-[width,height,max-height,transform] duration-200 ${
+            isExpanded
+              ? "inset-3 h-[calc(100vh-1.5rem)] max-h-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[90vh] sm:max-h-[90vh] sm:w-[72vw] sm:max-w-[1000px] sm:-translate-x-1/2 sm:-translate-y-1/2 lg:left-[240px] lg:translate-x-0"
+              : "inset-x-3 bottom-24 max-h-[78vh] sm:inset-x-auto sm:right-6 sm:w-[430px]"
+          }`}
+        >
           <header className="bg-purple-700 p-4 text-white">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -499,14 +579,33 @@ export default function SmartQaChat({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg p-1.5 transition hover:bg-white/15"
-                aria-label="Fermer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded((value) => !value)}
+                  className="rounded-lg p-1.5 transition hover:bg-white/15"
+                  aria-label={isExpanded ? "Réduire SMART-QA" : "Agrandir SMART-QA"}
+                  title={isExpanded ? "Réduire" : "Agrandir"}
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="h-5 w-5" />
+                  ) : (
+                    <Maximize2 className="h-5 w-5" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExpanded(false);
+                    setOpen(false);
+                  }}
+                  className="rounded-lg p-1.5 transition hover:bg-white/15"
+                  aria-label="Fermer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs">
@@ -551,7 +650,7 @@ export default function SmartQaChat({
               onChange={(event) =>
                 handleProviderChange(event.target.value as ChatProvider)
               }
-              disabled={Boolean(sessionId)}
+              disabled={sending}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-purple-500 disabled:bg-slate-100"
               aria-label="Fournisseur IA"
             >
@@ -563,7 +662,7 @@ export default function SmartQaChat({
               <select
                 value={projectId}
                 onChange={(event) => handleProjectChange(event.target.value)}
-                disabled={Boolean(sessionId)}
+                disabled={sending}
                 className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-purple-500 disabled:bg-slate-100"
                 aria-label="Contexte projet"
               >
@@ -578,7 +677,7 @@ export default function SmartQaChat({
               <select
                 value={explorationId}
                 onChange={(event) => handleExplorationChange(event.target.value)}
-                disabled={Boolean(sessionId) || availableExplorations.length === 0}
+                disabled={sending || availableExplorations.length === 0}
                 className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-purple-500 disabled:bg-slate-100"
                 aria-label="Contexte exploration"
               >
@@ -595,7 +694,8 @@ export default function SmartQaChat({
               <select
                 value={sessionId}
                 onChange={(event) => void selectSession(event.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-purple-500"
+                disabled={sending}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-purple-500 disabled:bg-slate-100"
                 aria-label="Conversation"
               >
                 <option value="">Nouvelle conversation</option>
@@ -627,7 +727,11 @@ export default function SmartQaChat({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4 sm:h-[390px]">
+          <div
+            className={`min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4 ${
+              isExpanded ? "" : "sm:h-[390px]"
+            }`}
+          >
             {loadingMessages ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-500">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -652,6 +756,9 @@ export default function SmartQaChat({
                       <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-purple-700">
                         <Bot className="h-3.5 w-3.5" />
                         SMART-QA
+                        {getMessageProviderLabel(message)
+                          ? ` · ${getMessageProviderLabel(message)}`
+                          : ""}
                       </div>
                     )}
                     <p className="whitespace-pre-wrap break-words leading-6">

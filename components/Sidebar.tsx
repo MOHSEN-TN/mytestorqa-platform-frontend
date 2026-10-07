@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Lock,
   User,
   FolderKanban,
   CheckSquare,
@@ -23,13 +22,20 @@ type SidebarItem = {
   adminOnly?: boolean;
 };
 
+const VIEWER_ALLOWED_ITEMS = new Set([
+  "/dashboard",
+  "/projects",
+  "/reports",
+  "/settings",
+]);
+
 const sidebarItems: SidebarItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
   },
-  
+
   {
     href: "/users",
     label: "User",
@@ -99,6 +105,14 @@ export default function Sidebar() {
   }, []);
 
   const visibleItems = sidebarItems.filter((item) => {
+    if (!currentRole) {
+      return false;
+    }
+
+    if (currentRole === "VIEWER") {
+      return VIEWER_ALLOWED_ITEMS.has(item.href);
+    }
+
     if (item.adminOnly && currentRole !== "ADMIN") {
       return false;
     }
@@ -109,8 +123,14 @@ export default function Sidebar() {
   return (
     <aside className="w-52 min-h-screen bg-slate-950 text-white flex flex-col">
       <div className="px-6 py-6">
-        <h1 className="text-xl font-bold">MyTester</h1>
-        <p className="text-xs text-slate-400">SMART QA Platform</p>
+        <Link
+          href={`/${locale}/dashboard`}
+          aria-label="Retour au Dashboard"
+          className="block rounded-md transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          <h1 className="text-xl font-bold">MyTester</h1>
+          <p className="text-xs text-slate-400">SMART QA Platform</p>
+        </Link>
       </div>
 
       <nav className="flex-1 px-4 py-4 space-y-1">

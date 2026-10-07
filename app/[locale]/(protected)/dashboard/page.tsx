@@ -125,6 +125,9 @@ export default function DashboardPage() {
     (state) => state.projects.selectedProject
   );
 
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const isViewer = currentRole === "VIEWER";
+  const canMutate = currentRole !== null && !isViewer;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -132,6 +135,13 @@ export default function DashboardPage() {
   const [quality, setQuality] = useState<LighthouseResult | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityError, setQualityError] = useState("");
+
+  useEffect(() => {
+    fetch(`${API_URL}/auth/me`, { credentials: "include" })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((user) => setCurrentRole(user?.role ?? null))
+      .catch(() => setCurrentRole(null));
+  }, []);
 
   useEffect(() => {
     if (!selectedProject?.id) {
@@ -329,18 +339,21 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void runQualityAudit()}
-              disabled={qualityLoading || !data.project.baseUrl}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {qualityLoading
-                ? "Audit en cours..."
-                : quality
-                  ? "Tester à nouveau"
-                  : "Tester maintenant"}
-            </button>
+            {canMutate && (
+              <button
+                type="button"
+                onClick={() => void runQualityAudit()}
+                disabled={qualityLoading || !data.project.baseUrl}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {qualityLoading
+                  ? "Audit en cours..."
+                  : quality
+                    ? "Tester à nouveau"
+                    : "Tester maintenant"}
+              </button>
+            )}
+
           </div>
 
           {qualityError && (
@@ -351,8 +364,9 @@ export default function DashboardPage() {
 
           {!data.project.baseUrl && (
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-600">
-              Ajoutez une URL au projet depuis la page Projet avant
-              de lancer Lighthouse.
+              {isViewer
+                ? "Aucune URL n’est configurée pour ce projet."
+                : "Ajoutez une URL au projet depuis la page Projet avant de lancer Lighthouse."}
             </div>
           )}
 

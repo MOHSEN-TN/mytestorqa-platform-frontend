@@ -195,9 +195,9 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-400 mt-0.5">{t("subtitle")}</p>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
         {/* Language Settings Card */}
-        <div className="max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="w-full rounded-xl border border-gray-100 bg-white shadow-sm lg:col-span-1">
           <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">
             <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-purple-50">
               <Globe size={15} className="text-purple-600" />
@@ -239,7 +239,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Password Settings Card */}
-        <div className="max-w-lg rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="w-full rounded-xl border border-gray-100 bg-white shadow-sm lg:col-span-2">
           <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">
             <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-50">
               <Lock size={15} className="text-blue-600" />

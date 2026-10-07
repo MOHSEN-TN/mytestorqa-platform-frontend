@@ -37,6 +37,9 @@ import {
   type ProjectImportResult,
 } from "@/lib/project-transfer-api";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+
 export default function ProjectsPage() {
   const { t } = useTranslation("projects");
   const dispatch = useAppDispatch();
@@ -54,6 +57,9 @@ export default function ProjectsPage() {
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const isViewer = currentRole === "VIEWER";
+  const canMutate = currentRole !== null && !isViewer;
 
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
@@ -84,6 +90,13 @@ export default function ProjectsPage() {
     useState<ProjectImportResult | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/auth/me`, { credentials: "include" })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((user) => setCurrentRole(user?.role ?? null))
+      .catch(() => setCurrentRole(null));
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -330,6 +343,8 @@ export default function ProjectsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        {canMutate && (
+          <>
         <button
           type="button"
           onClick={() => setShowNewModal(true)}
@@ -380,6 +395,9 @@ export default function ProjectsPage() {
           <Settings size={15} />
           {t("toolbar.settings")}
         </button>
+
+          </>
+        )}
 
         <div className="relative ml-auto">
           <Search
@@ -483,6 +501,8 @@ export default function ProjectsPage() {
                         <Eye size={14} />
                       </button>
 
+                      {canMutate && (
+                        <>
                       <button
                         type="button"
                         onClick={() => {
@@ -513,6 +533,8 @@ export default function ProjectsPage() {
                       >
                         <X size={14} />
                       </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

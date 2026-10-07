@@ -380,6 +380,7 @@ function CreateInput({
 
 export default function RunsPage() {
   const { t } = useTranslation("runs");
+  const { t: tProjects } = useTranslation("projects");
   const dispatch = useAppDispatch();
   const fullscreenRef = useRef<HTMLDivElement | null>(null);
 
@@ -388,6 +389,7 @@ export default function RunsPage() {
     loading: loadingProjects,
     selectedProject,
     error: projectError,
+    pagination: projectPagination,
   } = useAppSelector((s) => s.projects);
 
   const {
@@ -429,10 +431,32 @@ export default function RunsPage() {
   const [collapsedProjects, setCollapsedProjects] = useState(false);
   const [collapsedCampaigns, setCollapsedCampaigns] = useState(false);
   const [collapsedIterations, setCollapsedIterations] = useState(false);
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectLimit, setProjectLimit] = useState(5);
+
+  // Keep the displayed/fetched page valid when the total number of project
+  // pages decreases, without synchronously updating state from an effect.
+  const currentProjectPage =
+    projectPagination.totalPages > 0
+      ? Math.min(projectPage, projectPagination.totalPages)
+      : projectPage;
 
   useEffect(() => {
-    dispatch(fetchProjects());
-  }, [dispatch]);
+    dispatch(
+      fetchProjects({
+        page: currentProjectPage,
+        limit:
+          projectLimit === -1
+            ? Math.max(projectPagination.total, 1)
+            : projectLimit,
+      }),
+    );
+  }, [
+    dispatch,
+    currentProjectPage,
+    projectLimit,
+    projectPagination.total,
+  ]);
 
   useEffect(() => {
     if (!selectedProject?.id) {
@@ -901,6 +925,141 @@ export default function RunsPage() {
                     );
                   })
                 )}
+              </div>
+
+              <div className="border-t border-gray-100 px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-gray-500">
+                      {tProjects("pagination.show")}
+                    </span>
+
+                    <select
+                      value={projectLimit}
+                      onChange={(e) => {
+                        setProjectLimit(Number.parseInt(e.target.value, 10));
+                        setProjectPage(1);
+                      }}
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value={5}>
+                        {tProjects("pagination.perPage5")}
+                      </option>
+                      <option value={15}>
+                        {tProjects("pagination.perPage15")}
+                      </option>
+                      <option value={-1}>
+                        {tProjects("pagination.showAll")}
+                      </option>
+                    </select>
+
+                    <p className="text-sm text-gray-500">
+                      {projectPagination.total > 0
+                        ? tProjects("pagination.summary", {
+                            start:
+                              (currentProjectPage - 1) *
+                                (projectLimit === -1
+                                  ? projectPagination.total
+                                  : projectLimit) +
+                              1,
+                            end: Math.min(
+                              currentProjectPage *
+                                (projectLimit === -1
+                                  ? projectPagination.total
+                                  : projectLimit),
+                              projectPagination.total,
+                            ),
+                            total: projectPagination.total,
+                          })
+                        : tProjects("pagination.empty")}
+                    </p>
+                  </div>
+
+                  {projectLimit !== -1 &&
+                    projectPagination.totalPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setProjectPage(Math.max(1, currentProjectPage - 1))
+                          }
+                          disabled={currentProjectPage === 1 || loadingProjects}
+                          className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ChevronLeft size={15} />
+                          {tProjects("pagination.previous")}
+                        </button>
+
+                        {Array.from(
+                          { length: projectPagination.totalPages },
+                          (_, i) => i + 1,
+                        )
+                          .filter(
+                            (p) =>
+                              p === 1 ||
+                              p === projectPagination.totalPages ||
+                              Math.abs(p - currentProjectPage) <= 1,
+                          )
+                          .reduce<(number | "...")[]>(
+                            (acc, p, idx, arr) => {
+                              if (
+                                idx > 0 &&
+                                p - (arr[idx - 1] as number) > 1
+                              ) {
+                                acc.push("...");
+                              }
+                              acc.push(p);
+                              return acc;
+                            },
+                            [],
+                          )
+                          .map((p, idx) =>
+                            p === "..." ? (
+                              <span
+                                key={`project-ellipsis-${idx}`}
+                                className="px-2 text-gray-400"
+                              >
+                                …
+                              </span>
+                            ) : (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setProjectPage(p as number)}
+                                disabled={loadingProjects}
+                                className={`h-8 w-8 rounded-lg border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                  currentProjectPage === p
+                                    ? "border-blue-600 bg-blue-600 font-medium text-white"
+                                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            ),
+                          )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setProjectPage(
+                              Math.min(
+                                projectPagination.totalPages,
+                                currentProjectPage + 1,
+                              ),
+                            )
+                          }
+                          disabled={
+                            currentProjectPage === projectPagination.totalPages ||
+                            loadingProjects
+                          }
+                          className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {tProjects("pagination.next")}
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+                    )}
+                </div>
               </div>
             </section>
           )}

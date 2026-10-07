@@ -29,7 +29,15 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/projects/Modal";
 
-type UserRole = "TESTER" | "ADMIN" | "QA_LEAD";
+type UserRole = "TESTER" | "ADMIN" | "QA_LEAD" | "VIEWER";
+
+type ProjectOption = {
+  id: string;
+  name: string;
+};
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
 export default function UsersPage() {
   const dispatch = useAppDispatch();
@@ -60,6 +68,9 @@ export default function UsersPage() {
   const [userFirstName, setUserFirstName] = useState("");
   const [userLastName, setUserLastName] = useState("");
   const [userRole, setUserRole] = useState<UserRole>("TESTER");
+  const [viewerProjectId, setViewerProjectId] = useState("");
+  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
+  const [projectOptionsLoading, setProjectOptionsLoading] = useState(false);
 
   const [search, setSearch] = useState("");
 
@@ -69,11 +80,13 @@ export default function UsersPage() {
     lastName: string;
     email: string;
     role: UserRole;
+    projectId: string;
   }>({
     firstName: "",
     lastName: "",
     email: "",
     role: "TESTER",
+    projectId: "",
   });
 
   const [editError, setEditError] = useState<string | null>(null);
@@ -99,6 +112,40 @@ export default function UsersPage() {
   }, [search, page, limit, dispatch]);
 
   useEffect(() => {
+    let active = true;
+
+    const loadProjectOptions = async () => {
+      try {
+        setProjectOptionsLoading(true);
+        const response = await fetch(`${API_URL}/users/project-options`, {
+          credentials: "include",
+        });
+
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as { data?: ProjectOption[] };
+        if (active) {
+          setProjectOptions(payload.data ?? []);
+        }
+      } catch {
+        if (active) {
+          setProjectOptions([]);
+        }
+      } finally {
+        if (active) {
+          setProjectOptionsLoading(false);
+        }
+      }
+    };
+
+    void loadProjectOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (error && showNewModal) {
       setCreateError(error);
     }
@@ -117,6 +164,7 @@ export default function UsersPage() {
     setUserFirstName("");
     setUserLastName("");
     setUserRole("TESTER");
+    setViewerProjectId("");
   };
 
   const closeEditModal = () => {
@@ -126,6 +174,7 @@ export default function UsersPage() {
       lastName: "",
       email: "",
       role: "TESTER",
+      projectId: "",
     });
     setEditError(null);
   };
@@ -149,12 +198,18 @@ export default function UsersPage() {
       return;
     }
 
+    if (userRole === "VIEWER" && !viewerProjectId) {
+      setCreateError("Sélectionnez le projet accessible au Viewer.");
+      return;
+    }
+
     const result = await dispatch(
       createUser({
         email: userEmail.trim(),
         firstName: userFirstName.trim(),
         lastName: userLastName.trim(),
         role: userRole,
+        projectId: userRole === "VIEWER" ? viewerProjectId : undefined,
       }),
     );
 
@@ -191,14 +246,23 @@ export default function UsersPage() {
       return;
     }
 
+    if (editUserData.role === "VIEWER" && !editUserData.projectId) {
+      setEditError("Sélectionnez le projet accessible au Viewer.");
+      return;
+    }
+
     const result = await dispatch(
       updateUser({
         userId: editingUser.id,
         data: {
-          ...editUserData,
           firstName: editUserData.firstName.trim(),
           lastName: editUserData.lastName.trim(),
           email: editUserData.email.trim(),
+          role: editUserData.role,
+          projectId:
+            editUserData.role === "VIEWER"
+              ? editUserData.projectId
+              : undefined,
         },
       }),
     );
@@ -260,6 +324,8 @@ export default function UsersPage() {
         return "bg-purple-100 text-purple-700 border-purple-200";
       case "QA_LEAD":
         return "bg-blue-100 text-blue-700 border-blue-200";
+      case "VIEWER":
+        return "bg-slate-100 text-slate-700 border-slate-200";
       default:
         return "bg-green-100 text-green-700 border-green-200";
     }
@@ -271,6 +337,8 @@ export default function UsersPage() {
         return "Administrateur";
       case "QA_LEAD":
         return "Responsable QA";
+      case "VIEWER":
+        return "Stakeholder / Viewer";
       default:
         return "Testeur";
     }
@@ -394,6 +462,12 @@ export default function UsersPage() {
                         <Shield size={10} />
                         {getRoleLabel(user.role)}
                       </span>
+                      {user.role === "VIEWER" &&
+                        user.memberships?.[0]?.project?.name && (
+                          <p className="mt-1 text-xs text-gray-400">
+                            Projet : {user.memberships[0].project.name}
+                          </p>
+                        )}
                     </td>
 
                     <td className="px-6 py-4">
@@ -411,11 +485,16 @@ export default function UsersPage() {
                           type="button"
                           onClick={() => {
                             setEditingUser(user);
+                            const viewerMembership = user.memberships?.find(
+                              (membership: any) => membership.role === "VIEWER",
+                            );
+
                             setEditUserData({
                               firstName: user.firstName,
                               lastName: user.lastName,
                               email: user.email,
                               role: user.role as UserRole,
+                              projectId: viewerMembership?.projectId ?? "",
                             });
                             setEditError(null);
                           }}
@@ -616,16 +695,54 @@ export default function UsersPage() {
 
                 <select
                   value={userRole}
-                  onChange={(event) =>
-                    setUserRole(event.target.value as UserRole)
-                  }
+                  onChange={(event) => {
+                    const nextRole = event.target.value as UserRole;
+                    setUserRole(nextRole);
+                    if (nextRole !== "VIEWER") {
+                      setViewerProjectId("");
+                    }
+                    setCreateError(null);
+                  }}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="TESTER">Testeur</option>
                   <option value="QA_LEAD">Responsable QA</option>
+                  <option value="VIEWER">Stakeholder / Viewer</option>
                   <option value="ADMIN">Administrateur</option>
                 </select>
               </div>
+
+              {userRole === "VIEWER" && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Projet accessible *
+                  </label>
+                  <select
+                    value={viewerProjectId}
+                    onChange={(event) => {
+                      setViewerProjectId(event.target.value);
+                      setCreateError(null);
+                    }}
+                    disabled={projectOptionsLoading}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50"
+                    required
+                  >
+                    <option value="">
+                      {projectOptionsLoading
+                        ? "Chargement des projets..."
+                        : "Sélectionner un projet"}
+                    </option>
+                    {projectOptions.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Le Viewer pourra consulter uniquement ce projet.
+                  </p>
+                </div>
+              )}
 
               {createError && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
@@ -745,19 +862,59 @@ export default function UsersPage() {
 
                 <select
                   value={editUserData.role}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const nextRole = event.target.value as UserRole;
                     setEditUserData({
                       ...editUserData,
-                      role: event.target.value as UserRole,
-                    })
-                  }
+                      role: nextRole,
+                      projectId:
+                        nextRole === "VIEWER" ? editUserData.projectId : "",
+                    });
+                    setEditError(null);
+                  }}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="TESTER">Testeur</option>
                   <option value="QA_LEAD">Responsable QA</option>
+                  <option value="VIEWER">Stakeholder / Viewer</option>
                   <option value="ADMIN">Administrateur</option>
                 </select>
               </div>
+
+              {editUserData.role === "VIEWER" && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Projet accessible *
+                  </label>
+                  <select
+                    value={editUserData.projectId}
+                    onChange={(event) => {
+                      setEditUserData({
+                        ...editUserData,
+                        projectId: event.target.value,
+                      });
+                      setEditError(null);
+                    }}
+                    disabled={projectOptionsLoading}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50"
+                    required
+                  >
+                    <option value="">
+                      {projectOptionsLoading
+                        ? "Chargement des projets..."
+                        : "Sélectionner un projet"}
+                    </option>
+                    {projectOptions.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Toute ancienne affectation Viewer sera remplacée par ce projet.
+                  </p>
+                </div>
+              )}
 
               {editError && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">

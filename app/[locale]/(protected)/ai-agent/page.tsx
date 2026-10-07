@@ -1,11 +1,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Archive,
   Bot,
   Check,
+  ChevronLeft,
+  ChevronRight,
   FileCode2,
   Globe2,
   Loader2,
@@ -17,7 +19,8 @@ import {
   X,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
-import { fetchProjects } from "@/lib/slices/projectSlice";
+import { fetchProjects, setSelectedProject } from "@/lib/slices/projectSlice";
+import { useDebounce } from "@/hooks/useDebounce";
 import SmartQaChat from "./SmartQaChat";
 
 const API_BASE_URL =
@@ -261,12 +264,25 @@ function generationModeLabel(mode?: GenerationMode) {
 
 export default function AIAgentPage() {
   const dispatch = useAppDispatch();
-  const { projects, loading: projectsLoading } = useAppSelector(
+  const { projects, loading: projectsLoading, selectedProject } = useAppSelector(
     (state) => state.projects
   );
 
   const [explorations, setExplorations] = useState<AIExploration[]>([]);
+  const [explorationOptions, setExplorationOptions] = useState<
+    Array<{ id: string; projectId: string; title: string; status: string }>
+  >([]);
   const [search, setSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const debouncedSearch = useDebounce(search, 350);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 5,
+    total: 0,
+    totalPages: 0,
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedExploration, setSelectedExploration] =
     useState<AIExploration | null>(null);
@@ -283,54 +299,126 @@ export default function AIAgentPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchExplorations = useCallback(async () => {
-    try {
-      setLoadingExplorations(true);
-      setError(null);
+  const fetchExplorations = useCallback(
+    async (targetPage = page, targetLimit = limit) => {
+      try {
+        setLoadingExplorations(true);
+        setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/ai-exploration`, {
+        const query = new URLSearchParams({
+          page: String(targetPage),
+          limit: String(targetLimit),
+        });
+
+        if (debouncedSearch.trim()) {
+          query.set("search", debouncedSearch.trim());
+        }
+
+        if (selectedProjectId) {
+          query.set("projectId", selectedProjectId);
+        }
+
+        const response = await fetch(
+          `${API_BASE_URL}/ai-exploration?${query.toString()}`,
+          {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const data = await readResponse(response);
+
+        if (!response.ok) {
+          throw new Error(
+            getErrorMessage(data, "Impossible de charger les explorations IA")
+          );
+        }
+
+        if (Array.isArray(data)) {
+          setExplorations(data as AIExploration[]);
+          setPagination({
+            page: 1,
+            limit: targetLimit,
+            total: data.length,
+            totalPages: data.length > 0 ? 1 : 0,
+          });
+          return;
+        }
+
+        const result = (data || {}) as {
+          data?: AIExploration[];
+          pagination?: {
+            page?: number;
+            limit?: number;
+            total?: number;
+            totalPages?: number;
+          };
+        };
+
+        setExplorations(Array.isArray(result.data) ? result.data : []);
+        setPagination({
+          page: result.pagination?.page ?? targetPage,
+          limit: result.pagination?.limit ?? targetLimit,
+          total: result.pagination?.total ?? 0,
+          totalPages: result.pagination?.totalPages ?? 0,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erreur inconnue");
+      } finally {
+        setLoadingExplorations(false);
+      }
+    },
+    [debouncedSearch, limit, page, selectedProjectId]
+  );
+
+  const fetchExplorationOptions = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai-exploration/options`, {
         method: "GET",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
       });
-
       const data = await readResponse(response);
 
-      if (!response.ok) {
-        throw new Error(
-          getErrorMessage(data, "Impossible de charger les explorations IA")
-        );
-      }
+      if (!response.ok) return;
 
-      setExplorations(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur inconnue");
-    } finally {
-      setLoadingExplorations(false);
+      setExplorationOptions(
+        Array.isArray(data)
+          ? (data as Array<{
+              id: string;
+              projectId: string;
+              title: string;
+              status: string;
+            }>)
+          : []
+      );
+    } catch {
+      // La liste principale reste utilisable même si les options du chatbot échouent.
     }
   }, []);
 
-  const filteredExplorations = useMemo(() => {
-    const value = search.trim().toLowerCase();
-
-    if (!value) return explorations;
-
-    return explorations.filter((exploration) => {
-      return (
-        exploration.title.toLowerCase().includes(value) ||
-        exploration.project?.name?.toLowerCase().includes(value) ||
-        exploration.targetUrl?.toLowerCase().includes(value) ||
-        exploration.status.toLowerCase().includes(value)
-      );
-    });
-  }, [explorations, search]);
-
   useEffect(() => {
     dispatch(fetchProjects({ page: 1, limit: 100 }));
-    fetchExplorations();
-  }, [dispatch, fetchExplorations]);
+    void fetchExplorationOptions();
+  }, [dispatch, fetchExplorationOptions]);
+
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+
+    setSelectedProjectId(selectedProject.id);
+    setSelectedExploration(null);
+    setPage(1);
+  }, [selectedProject?.id]);
+
+  useEffect(() => {
+    void fetchExplorations();
+  }, [fetchExplorations]);
+
 
   function openCreateModal() {
     setError(null);
@@ -338,7 +426,10 @@ export default function AIAgentPage() {
     setSelectedExploration(null);
     setForm({
       ...defaultForm,
-      projectId: projects[0]?.id || "",
+      projectId:
+        (selectedProject && projects.some((project) => project.id === selectedProject.id)
+          ? selectedProject.id
+          : projects[0]?.id) || "",
     });
     setIsModalOpen(true);
   }
@@ -428,7 +519,12 @@ Contexte additionnel: ${form.context || "Aucun"}
         );
       }
 
-      setExplorations((previous) => [data as AIExploration, ...previous]);
+      void data;
+      setPage(1);
+      await Promise.all([
+        fetchExplorations(1, limit),
+        fetchExplorationOptions(),
+      ]);
       setForm(defaultForm);
       setIsModalOpen(false);
       setSuccessMessage("Exploration IA créée avec succès.");
@@ -677,11 +773,17 @@ Contexte additionnel: ${form.context || "Aucun"}
         );
       }
 
-      setExplorations((previous) => previous.filter((item) => item.id !== id));
-
       if (selectedExploration?.id === id) {
         setSelectedExploration(null);
       }
+
+      const nextPage = explorations.length === 1 && page > 1 ? page - 1 : page;
+      if (nextPage !== page) {
+        setPage(nextPage);
+      } else {
+        await fetchExplorations(nextPage, limit);
+      }
+      await fetchExplorationOptions();
 
       setSuccessMessage("Exploration supprimée.");
     } catch (err) {
@@ -694,66 +796,92 @@ Contexte additionnel: ${form.context || "Aucun"}
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
-              <Bot className="h-7 w-7" />
+        <div className="flex flex-col gap-3 rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+              <Bot className="h-6 w-6" />
             </div>
 
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">
+              <h1 className="text-2xl font-bold text-slate-900">
                 IA Explorer · SMART-QA
               </h1>
-              <p className="mt-1 text-slate-600">
-                Exploration intelligente, génération de scénarios et chatbot QA
-                local propulsés par Qwen3.5 9B via Ollama.
-              </p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-purple-800"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-800"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4 w-4" />
             Nouvelle exploration
           </button>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           <FeatureCard
-            icon={<Globe2 className="h-7 w-7" />}
+            icon={<Globe2 className="h-5 w-5" />}
             title="Exploration automatique"
             description="Analyse les pages, formulaires et parcours critiques de ton application."
           />
           <FeatureCard
-            icon={<FileCode2 className="h-7 w-7" />}
+            icon={<FileCode2 className="h-5 w-5" />}
             title="Génération de tests"
             description="Prépare des scénarios Playwright et Gherkin à partir de l’exploration."
           />
           <FeatureCard
-            icon={<Sparkles className="h-7 w-7" />}
+            icon={<Sparkles className="h-5 w-5" />}
             title="Priorisation intelligente"
             description="Classe les scénarios selon les risques, la criticité et les cas négatifs."
           />
         </div>
 
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="relative w-full md:max-w-xl">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Rechercher une exploration..."
-                className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-slate-900 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-100"
-              />
+        <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full flex-col gap-2.5 md:flex-row lg:max-w-4xl">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Rechercher une exploration..."
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-100"
+                />
+              </div>
+
+              <select
+                value={selectedProjectId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSelectedProjectId(value);
+                  setPage(1);
+                  setSelectedExploration(null);
+
+                  if (value) {
+                    const project = projects.find((item) => item.id === value);
+                    if (project) dispatch(setSelectedProject(project));
+                  }
+                }}
+                disabled={projectsLoading}
+                aria-label="Filtrer les explorations par projet"
+                className="min-w-56 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">Tous les projets</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="inline-flex items-center gap-2 rounded-xl bg-purple-50 px-4 py-3 font-semibold text-purple-700">
-              <Wand2 className="h-5 w-5" />
-              {filteredExplorations.length} explorations
+            <div className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-purple-50 px-3.5 py-2.5 text-sm font-semibold text-purple-700">
+              <Wand2 className="h-4 w-4" />
+              {pagination.total} explorations
             </div>
           </div>
         </div>
@@ -776,7 +904,7 @@ Contexte additionnel: ${form.context || "Aucun"}
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Chargement des explorations...
             </div>
-          ) : filteredExplorations.length === 0 ? (
+          ) : explorations.length === 0 ? (
             <div className="flex min-h-60 flex-col items-center justify-center text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-purple-700">
                 <Wand2 className="h-8 w-8" />
@@ -799,7 +927,7 @@ Contexte additionnel: ${form.context || "Aucun"}
             </div>
           ) : (
             <div className="grid gap-4">
-              {filteredExplorations.map((exploration) => (
+              {explorations.map((exploration) => (
                 <ExplorationCard
                   key={exploration.id}
                   exploration={exploration}
@@ -812,6 +940,119 @@ Contexte additionnel: ${form.context || "Aucun"}
                   onDelete={() => handleDelete(exploration.id)}
                 />
               ))}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-slate-500">Afficher</span>
+
+                  <select
+                    value={limit}
+                    onChange={(event) => {
+                      setLimit(Number.parseInt(event.target.value, 10));
+                      setPage(1);
+                    }}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
+                  >
+                    <option value={5}>5 par page</option>
+                    <option value={15}>15 par page</option>
+                    <option value={-1}>Tous</option>
+                  </select>
+
+                  <p className="text-sm text-slate-500">
+                    {pagination.total > 0
+                      ? `${
+                          limit === -1
+                            ? 1
+                            : (page - 1) * Math.max(limit, 1) + 1
+                        }-${
+                          limit === -1
+                            ? pagination.total
+                            : Math.min(page * limit, pagination.total)
+                        } sur ${pagination.total}`
+                      : "Aucune exploration"}
+                  </p>
+                </div>
+
+                {limit !== -1 && pagination.totalPages > 1 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((current) => Math.max(1, current - 1))
+                      }
+                      disabled={page === 1 || loadingExplorations}
+                      className="flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Précédent
+                    </button>
+
+                    {Array.from(
+                      { length: pagination.totalPages },
+                      (_, index) => index + 1
+                    )
+                      .filter(
+                        (pageNumber) =>
+                          pageNumber === 1 ||
+                          pageNumber === pagination.totalPages ||
+                          Math.abs(pageNumber - page) <= 1
+                      )
+                      .reduce<(number | "...")[]>(
+                        (items, pageNumber, index, pages) => {
+                          if (
+                            index > 0 &&
+                            pageNumber - (pages[index - 1] as number) > 1
+                          ) {
+                            items.push("...");
+                          }
+                          items.push(pageNumber);
+                          return items;
+                        },
+                        []
+                      )
+                      .map((item, index) =>
+                        item === "..." ? (
+                          <span
+                            key={`ellipsis-${index}`}
+                            className="px-2 text-slate-400"
+                          >
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setPage(item as number)}
+                            disabled={loadingExplorations}
+                            className={`h-8 w-8 rounded-lg border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                              page === item
+                                ? "border-purple-700 bg-purple-700 font-medium text-white"
+                                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((current) =>
+                          Math.min(pagination.totalPages, current + 1)
+                        )
+                      }
+                      disabled={
+                        page === pagination.totalPages || loadingExplorations
+                      }
+                      className="flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Suivant
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -858,12 +1099,18 @@ Contexte additionnel: ${form.context || "Aucun"}
                 <Field label="Projet">
                   <select
                     value={form.projectId}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const value = event.target.value;
                       setForm((previous) => ({
                         ...previous,
-                        projectId: event.target.value,
-                      }))
-                    }
+                        projectId: value,
+                      }));
+
+                      if (value) {
+                        const project = projects.find((item) => item.id === value);
+                        if (project) dispatch(setSelectedProject(project));
+                      }
+                    }}
                     disabled={projectsLoading}
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-100"
                   >
@@ -1313,12 +1560,7 @@ Contexte additionnel: ${form.context || "Aucun"}
       <SmartQaChat
         apiBaseUrl={API_BASE_URL}
         projects={projects}
-        explorations={explorations.map((exploration) => ({
-          id: exploration.id,
-          projectId: exploration.projectId,
-          title: exploration.title,
-          status: exploration.status,
-        }))}
+        explorations={explorationOptions}
       />
     </div>
   );
@@ -1334,12 +1576,14 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
+    <div className="flex min-h-[108px] items-start gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
         {icon}
       </div>
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      <p className="mt-3 leading-7 text-slate-600">{description}</p>
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-slate-900">{title}</h2>
+        <p className="mt-1.5 text-sm leading-5 text-slate-600">{description}</p>
+      </div>
     </div>
   );
 }

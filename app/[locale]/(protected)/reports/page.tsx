@@ -6,6 +6,8 @@ import {
   AlertCircle,
   Bug,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Eye,
   FileText,
@@ -128,10 +130,12 @@ const formatDuration = (milliseconds: unknown) => {
   return `${minutes} min ${Math.round(seconds % 60)} s`;
 };
 
-const getDownloadUrl = (reportId: string) => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
-  return `${baseUrl}/reports/${reportId}/download`;
-};
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
+
+const getDownloadUrl = (reportId: string) =>
+  `${API_URL}/reports/${reportId}/download`;
 
 export default function ReportsPage() {
   const dispatch = useAppDispatch();
@@ -147,11 +151,17 @@ export default function ReportsPage() {
     deleting,
     previewLoading,
     error,
+    pagination,
   } = useAppSelector((state: any) => state.reports);
 
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const isViewer = currentRole === "VIEWER";
+  const canMutate = currentRole !== null && !isViewer;
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [projectFilter, setProjectFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);
 
   const [showModal, setShowModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -171,6 +181,13 @@ export default function ReportsPage() {
   );
 
   useEffect(() => {
+    fetch(`${API_URL}/auth/me`, { credentials: "include" })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((user) => setCurrentRole(user?.role ?? null))
+      .catch(() => setCurrentRole(null));
+  }, []);
+
+  useEffect(() => {
     dispatch(fetchReportOptions());
     dispatch(fetchReportStats());
   }, [dispatch]);
@@ -179,31 +196,36 @@ export default function ReportsPage() {
     const timer = setTimeout(() => {
       dispatch(
         fetchReports({
-          page: 1,
-          limit: 10,
+          page,
+          limit,
           search: search || undefined,
           type: typeFilter,
           format: "ALL",
-          status: statusFilter,
+          projectId: projectFilter !== "ALL" ? projectFilter : undefined,
         }),
       );
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [dispatch, search, typeFilter, statusFilter]);
+  }, [dispatch, search, typeFilter, projectFilter, page, limit]);
 
-  const refreshReports = () => {
+  const refreshReports = (targetPage = page) => {
     dispatch(fetchReportStats());
     dispatch(
       fetchReports({
-        page: 1,
-        limit: 10,
+        page: targetPage,
+        limit,
         search: search || undefined,
         type: typeFilter,
         format: "ALL",
-        status: statusFilter,
+        projectId: projectFilter !== "ALL" ? projectFilter : undefined,
       }),
     );
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
   };
 
   const resetForm = () => {
@@ -246,7 +268,8 @@ export default function ReportsPage() {
 
     if (createReport.fulfilled.match(result)) {
       closeModal();
-      refreshReports();
+      setPage(1);
+      refreshReports(1);
     } else {
       setFormError(
         (result as any)?.payload?.message ||
@@ -267,7 +290,12 @@ export default function ReportsPage() {
     const result = await dispatch(deleteReport(reportId));
 
     if (deleteReport.fulfilled.match(result)) {
-      refreshReports();
+      if (reports.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+        dispatch(fetchReportStats());
+      } else {
+        refreshReports(page);
+      }
     }
   };
 
@@ -338,6 +366,14 @@ export default function ReportsPage() {
     return <Icon size={15} />;
   };
 
+  const currentLimit = limit === -1 ? pagination.total : limit;
+  const startItem =
+    pagination.total > 0 ? (page - 1) * Math.max(currentLimit, 1) + 1 : 0;
+  const endItem = Math.min(
+    page * Math.max(currentLimit, 1),
+    pagination.total,
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -348,13 +384,16 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          <Plus size={15} />
-          Nouveau rapport
-        </button>
+        {canMutate && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus size={15} />
+            Nouveau rapport
+          </button>
+        )}
+
       </div>
 
       {error && (
@@ -396,7 +435,10 @@ export default function ReportsPage() {
               />
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Rechercher..."
                 className="w-48 rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
@@ -404,7 +446,10 @@ export default function ReportsPage() {
 
             <select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600"
             >
               <option value="ALL">Tous les types</option>
@@ -414,15 +459,19 @@ export default function ReportsPage() {
             </select>
 
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600"
             >
-              <option value="ALL">Tous les statuts</option>
-              <option value="GENERATED">Généré</option>
-              <option value="SCHEDULED">Planifié</option>
-              <option value="GENERATING">En génération</option>
-              <option value="FAILED">Échec</option>
+              <option value="ALL">Tous les projets</option>
+              {(options?.projects || []).map((project: any) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -520,14 +569,17 @@ export default function ReportsPage() {
                           <Download size={15} />
                         </button>
 
-                        <button
-                          disabled={deleting}
-                          onClick={() => handleDelete(report.id)}
-                          className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {canMutate && (
+                          <button
+                            disabled={deleting}
+                            onClick={() => handleDelete(report.id)}
+                            className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+
                       </div>
                     </td>
                   </tr>
@@ -535,6 +587,98 @@ export default function ReportsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-gray-500">Afficher</span>
+
+            <select
+              value={limit}
+              onChange={(e) => handleLimitChange(Number.parseInt(e.target.value, 10))}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value={5}>5 par page</option>
+              <option value={15}>15 par page</option>
+              <option value={-1}>Tous</option>
+            </select>
+
+            <p className="text-sm text-gray-500">
+              {pagination.total > 0
+                ? `${startItem}-${endItem} sur ${pagination.total}`
+                : "Aucun rapport"}
+            </p>
+          </div>
+
+          {limit !== -1 && pagination.totalPages > 1 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1 || loading}
+                className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={15} />
+                Précédent
+              </button>
+
+              {Array.from(
+                { length: pagination.totalPages },
+                (_, index) => index + 1,
+              )
+                .filter(
+                  (pageNumber) =>
+                    pageNumber === 1 ||
+                    pageNumber === pagination.totalPages ||
+                    Math.abs(pageNumber - page) <= 1,
+                )
+                .reduce<(number | "...")[]>((items, pageNumber, index, pages) => {
+                  if (
+                    index > 0 &&
+                    pageNumber - (pages[index - 1] as number) > 1
+                  ) {
+                    items.push("...");
+                  }
+                  items.push(pageNumber);
+                  return items;
+                }, [])
+                .map((item, index) =>
+                  item === "..." ? (
+                    <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item as number)}
+                      disabled={loading}
+                      className={`h-8 w-8 rounded-lg border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                        page === item
+                          ? "border-blue-600 bg-blue-600 font-medium text-white"
+                          : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(pagination.totalPages, current + 1),
+                  )
+                }
+                disabled={page === pagination.totalPages || loading}
+                className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Suivant
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

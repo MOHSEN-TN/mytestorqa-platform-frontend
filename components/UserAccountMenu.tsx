@@ -77,6 +77,8 @@ export default function UserAccountMenu() {
         return "Responsable QA";
       case "TESTER":
         return "Testeur";
+      case "VIEWER":
+        return "Stakeholder / Viewer";
       default:
         return role || "-";
     }

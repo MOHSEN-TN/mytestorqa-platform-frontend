@@ -30,9 +30,7 @@ export default function ClientLayout({
 
   return (
     <I18nextProvider i18n={i18n}>
-      <Provider store={store}>
-        {children}
-      </Provider>
+      <Provider store={store}>{children}</Provider>
     </I18nextProvider>
   );
 }

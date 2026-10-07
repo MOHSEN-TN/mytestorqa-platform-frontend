@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Bug,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Filter,
   Plus,
@@ -30,6 +32,7 @@ import {
   updateBug,
 } from "@/lib/slices/bugSlice";
 import { Modal } from "@/components/projects/Modal";
+import { setSelectedProject } from "@/lib/slices/projectSlice";
 
 type TabType = "ALL" | "OPEN" | "MINE";
 
@@ -46,12 +49,18 @@ export default function BugsPage() {
     updating,
     deleting,
     error,
+    pagination,
   } = useAppSelector((state: any) => state.bugs);
+  const selectedProject = useAppSelector(
+    (state: any) => state.projects.selectedProject,
+  );
 
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<TabType>("ALL");
   const [showNewModal, setShowNewModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -59,35 +68,79 @@ export default function BugsPage() {
   const [severity, setSeverity] = useState<BugSeverity>("MAJOR");
   const [priority, setPriority] = useState<BugPriority>("MEDIUM");
   const [projectId, setProjectId] = useState("");
+  const [suiteId, setSuiteId] = useState("");
   const [testCaseId, setTestCaseId] = useState("");
-  const [executionId, setExecutionId] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [iterationId, setIterationId] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [formError, setFormError] = useState<string | null>(null);
-
-  useEffect(() => {
-    dispatch(fetchBugOptions());
-  }, [dispatch]);
 
   useEffect(() => {
     dispatch(fetchBugStats());
   }, [dispatch]);
 
+  /*
+   * Synchronisation volontaire entre le projet sélectionné globalement
+   * et le contexte local du formulaire de gestion des bugs.
+   *
+   * Lorsqu'un projet change, les dépendances du formulaire doivent être
+   * réinitialisées (suite, cas de test, campagne, itération) et les options
+   * correspondantes doivent être rechargées. Cette logique est nécessaire
+   * au fonctionnement métier actuel.
+   *
+   * La règle react-hooks/set-state-in-effect est donc désactivée uniquement
+   * pour cet effet afin de conserver exactement ce comportement.
+   */
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!selectedProject?.id) {
+      dispatch(fetchBugOptions(undefined));
+      setProjectId("");
+      setSuiteId("");
+      setTestCaseId("");
+      setCampaignId("");
+      setIterationId("");
+      return;
+    }
+
+    setProjectFilter(selectedProject.id);
+    setProjectId(selectedProject.id);
+    setSuiteId("");
+    setTestCaseId("");
+    setCampaignId("");
+    setIterationId("");
+    setPage(1);
+    dispatch(fetchBugOptions({ projectId: selectedProject.id }));
+  }, [dispatch, selectedProject?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   useEffect(() => {
     const timer = setTimeout(() => {
       dispatch(
         fetchBugs({
-          page: 1,
-          limit: 20,
+          page,
+          limit: limit === -1 ? pagination.total : limit,
           search: search || undefined,
           status: tab === "OPEN" ? "OPEN" : statusFilter,
+          projectId: projectFilter === "ALL" ? undefined : projectFilter,
           mine: tab === "MINE",
         }),
       );
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [dispatch, search, tab, statusFilter]);
+  }, [
+    dispatch,
+    search,
+    tab,
+    statusFilter,
+    projectFilter,
+    page,
+    limit,
+    pagination.total,
+  ]);
 
   const resetForm = () => {
     setTitle("");
@@ -95,9 +148,11 @@ export default function BugsPage() {
     setSteps("");
     setSeverity("MAJOR");
     setPriority("MEDIUM");
-    setProjectId("");
+    setProjectId(selectedProject?.id || "");
+    setSuiteId("");
     setTestCaseId("");
-    setExecutionId("");
+    setCampaignId("");
+    setIterationId("");
     setAssigneeId("");
     setFormError(null);
   };
@@ -125,7 +180,7 @@ export default function BugsPage() {
         priority,
         projectId: projectId || undefined,
         testCaseId: testCaseId || undefined,
-        executionId: executionId || undefined,
+        iterationId: testCaseId && iterationId ? iterationId : undefined,
         assigneeId: assigneeId || undefined,
       }),
     );
@@ -133,12 +188,14 @@ export default function BugsPage() {
     if (createBug.fulfilled.match(res)) {
       closeNewModal();
       dispatch(fetchBugStats());
+      setPage(1);
       dispatch(
         fetchBugs({
           page: 1,
-          limit: 20,
+          limit: limit === -1 ? Math.max(pagination.total + 1, 1) : limit,
           search: search || undefined,
           status: tab === "OPEN" ? "OPEN" : statusFilter,
+          projectId: projectFilter === "ALL" ? undefined : projectFilter,
           mine: tab === "MINE",
         }),
       );
@@ -159,10 +216,11 @@ export default function BugsPage() {
       dispatch(fetchBugStats());
       dispatch(
         fetchBugs({
-          page: 1,
-          limit: 20,
+          page,
+          limit: limit === -1 ? pagination.total : limit,
           search: search || undefined,
           status: tab === "OPEN" ? "OPEN" : statusFilter,
+          projectId: projectFilter === "ALL" ? undefined : projectFilter,
           mine: tab === "MINE",
         }),
       );
@@ -176,6 +234,21 @@ export default function BugsPage() {
 
     if (deleteBug.fulfilled.match(res)) {
       dispatch(fetchBugStats());
+
+      if (bugs.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+      } else {
+        dispatch(
+          fetchBugs({
+            page,
+            limit: limit === -1 ? Math.max(pagination.total - 1, 1) : limit,
+            search: search || undefined,
+            status: tab === "OPEN" ? "OPEN" : statusFilter,
+            projectId: projectFilter === "ALL" ? undefined : projectFilter,
+            mine: tab === "MINE",
+          }),
+        );
+      }
     }
   };
 
@@ -262,6 +335,19 @@ export default function BugsPage() {
     return fullName || user.email;
   };
 
+  const handleLimitChange = (value: number) => {
+    setLimit(value);
+    setPage(1);
+  };
+
+  const currentLimit = limit === -1 ? pagination.total : limit;
+  const startItem =
+    pagination.total > 0 ? (page - 1) * Math.max(currentLimit, 1) + 1 : 0;
+  const endItem = Math.min(
+    page * Math.max(currentLimit, 1),
+    pagination.total,
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -346,7 +432,10 @@ export default function BugsPage() {
           />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Rechercher un bug..."
             className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-4 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
@@ -363,21 +452,57 @@ export default function BugsPage() {
 
       {showFilters && (
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            Statut
-          </label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-64 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="ALL">Tous</option>
-            <option value="NEW">Nouveau</option>
-            <option value="IN_PROGRESS">En cours</option>
-            <option value="RESOLVED">Résolu</option>
-            <option value="CLOSED">Fermé</option>
-            <option value="REOPENED">Réouvert</option>
-          </select>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500">
+                Projet
+              </label>
+              <select
+                value={projectFilter}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setProjectFilter(value);
+                  setPage(1);
+
+                  if (value !== "ALL") {
+                    const project = options?.projects?.find(
+                      (item: any) => item.id === value,
+                    );
+                    if (project) dispatch(setSelectedProject(project));
+                  }
+                }}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="ALL">Tous les projets</option>
+                {options?.projects?.map((project: any) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500">
+                Statut
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="ALL">Tous</option>
+                <option value="NEW">Nouveau</option>
+                <option value="IN_PROGRESS">En cours</option>
+                <option value="RESOLVED">Résolu</option>
+                <option value="CLOSED">Fermé</option>
+                <option value="REOPENED">Réouvert</option>
+              </select>
+            </div>
+          </div>
         </div>
       )}
 
@@ -389,7 +514,10 @@ export default function BugsPage() {
         ].map((item) => (
           <button
             key={item.key}
-            onClick={() => setTab(item.key as TabType)}
+            onClick={() => {
+              setTab(item.key as TabType);
+              setPage(1);
+            }}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === item.key
                 ? "border-blue-600 text-blue-600"
@@ -466,6 +594,101 @@ export default function BugsPage() {
               </button>
             ))
           )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-gray-500">Afficher</span>
+
+              <select
+                value={limit}
+                onChange={(e) => handleLimitChange(Number.parseInt(e.target.value, 10))}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value={5}>5 par page</option>
+                <option value={15}>15 par page</option>
+                <option value={-1}>Tous</option>
+              </select>
+
+              <p className="text-sm text-gray-500">
+                {pagination.total > 0
+                  ? `${startItem}-${endItem} sur ${pagination.total}`
+                  : "Aucun bug"}
+              </p>
+            </div>
+
+            {limit !== -1 && pagination.totalPages > 1 && (
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1 || loading}
+                  className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={15} />
+                  Précédent
+                </button>
+
+                {Array.from(
+                  { length: pagination.totalPages },
+                  (_, index) => index + 1,
+                )
+                  .filter(
+                    (pageNumber) =>
+                      pageNumber === 1 ||
+                      pageNumber === pagination.totalPages ||
+                      Math.abs(pageNumber - page) <= 1,
+                  )
+                  .reduce<(number | "...")[]>((items, pageNumber, index, pages) => {
+                    if (
+                      index > 0 &&
+                      pageNumber - (pages[index - 1] as number) > 1
+                    ) {
+                      items.push("...");
+                    }
+                    items.push(pageNumber);
+                    return items;
+                  }, [])
+                  .map((item, index) =>
+                    item === "..." ? (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="px-2 text-gray-400"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setPage(item as number)}
+                        disabled={loading}
+                        className={`h-8 w-8 rounded-lg border text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                          page === item
+                            ? "border-blue-600 bg-blue-600 font-medium text-white"
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ),
+                  )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage((current) =>
+                      Math.min(pagination.totalPages, current + 1),
+                    )
+                  }
+                  disabled={page === pagination.totalPages || loading}
+                  className="flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Suivant
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -688,7 +911,23 @@ export default function BugsPage() {
                 </label>
                 <select
                   value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setProjectId(value);
+                    setSuiteId("");
+                    setTestCaseId("");
+                    setCampaignId("");
+                    setIterationId("");
+
+                    if (value) {
+                      const project = options?.projects?.find(
+                        (item: any) => item.id === value,
+                      );
+                      if (project) dispatch(setSelectedProject(project));
+                    } else {
+                      dispatch(fetchBugOptions(undefined));
+                    }
+                  }}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 >
                   <option value="">Aucun</option>
@@ -702,12 +941,56 @@ export default function BugsPage() {
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Suite de test liée
+                </label>
+                <select
+                  value={suiteId}
+                  disabled={!projectId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSuiteId(value);
+                    setTestCaseId("");
+                    dispatch(
+                      fetchBugOptions({
+                        projectId: projectId || undefined,
+                        suiteId: value || undefined,
+                        campaignId: campaignId || undefined,
+                        iterationId: iterationId || undefined,
+                      }),
+                    );
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">Aucune</option>
+                  {options?.suites?.map((suite: any) => (
+                    <option key={suite.id} value={suite.id}>
+                      {suite.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
                   Cas de test lié
                 </label>
                 <select
                   value={testCaseId}
-                  onChange={(e) => setTestCaseId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  disabled={!suiteId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTestCaseId(value);
+                    dispatch(
+                      fetchBugOptions({
+                        projectId: projectId || undefined,
+                        suiteId: suiteId || undefined,
+                        testCaseId: value || undefined,
+                        campaignId: campaignId || undefined,
+                        iterationId: iterationId || undefined,
+                      }),
+                    );
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
                 >
                   <option value="">Aucun</option>
                   {options?.testCases?.map((testCase: any) => (
@@ -720,22 +1003,56 @@ export default function BugsPage() {
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Exécution liée
+                  Campagne liée
                 </label>
                 <select
-                  value={executionId}
-                  onChange={(e) => setExecutionId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  value={campaignId}
+                  disabled={!projectId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCampaignId(value);
+                    setIterationId("");
+                    dispatch(
+                      fetchBugOptions({
+                        projectId: projectId || undefined,
+                        suiteId: suiteId || undefined,
+                        testCaseId: testCaseId || undefined,
+                        campaignId: value || undefined,
+                      }),
+                    );
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
                 >
                   <option value="">Aucune</option>
-                  {options?.executions?.map((execution: any) => (
-                    <option key={execution.id} value={execution.id}>
-                      {execution.testCase?.title || execution.id} -{" "}
-                      {execution.status}
+                  {options?.campaigns?.map((campaign: any) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.name}
                     </option>
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Itération liée
+                </label>
+                <select
+                  value={iterationId}
+                  disabled={!campaignId}
+                  onChange={(e) => {
+                    setIterationId(e.target.value);
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">Aucune</option>
+                  {options?.iterations?.map((iteration: any) => (
+                    <option key={iteration.id} value={iteration.id}>
+                      {iteration.name} - {iteration.status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
